@@ -1,0 +1,11 @@
+uploads/
+__pycache__/
+*.pyc
+.env
+
+# Docker build cache
+*.log
+
+# OS系
+.DS_Store
+Thumbs.db
