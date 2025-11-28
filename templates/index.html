@@ -95,6 +95,7 @@
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     /* ギャラリー内のサムネイル（画像・動画） */
@@ -103,6 +104,59 @@
       height: 180px;
       object-fit: cover;
       display: block;
+    }
+
+    .card-menu-toggle {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      border-radius: 14px;
+      border: none;
+      background: rgba(255, 255, 255, 0.9);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* メニュー本体 */
+    .card-menu {
+      position: absolute;
+      top: 34px;
+      right: 8px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      padding: 6px 0;
+      min-width: 120px;
+      z-index: 50;
+      display: none;
+    }
+
+    .card-menu.open {
+      display: block;
+    }
+
+    .card-menu a,
+    .card-menu button {
+      display: block;
+      width: 100%;
+      padding: 6px 12px;
+      text-align: left;
+      background: none;
+      border: none;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .card-menu a:hover,
+    .card-menu button:hover {
+      background: #f2f2f2;
     }
 
     .card-body {
@@ -399,6 +453,29 @@
         closeModal();
       }
     }
+
+    function toggleMenu(button, event) {
+      event.stopPropagation(); // 背景クリックやモーダルを開かせない
+
+      const menu = button.nextElementSibling; // ボタンの次の要素がメニュー
+      if (!menu) return;
+
+      const isOpen = menu.classList.contains('open');
+
+      // 他のメニューは全部閉じる
+      document.querySelectorAll('.card-menu').forEach(m => m.classList.remove('open'));
+
+      // 今クリックしたカードのメニューだけ開く/閉じる
+      if (!isOpen) {
+        menu.classList.add('open');
+      }
+    }
+
+    // 画面のどこかをクリックしたらメニューを閉じる
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.card-menu').forEach(m => m.classList.remove('open'));
+    });
+
   </script>
 </head>
 
@@ -422,10 +499,22 @@
       </form>
     </div>
 
-    <!-- 一覧表示 -->
     <div class="grid">
       {% for p in photos %}
       <div class="card">
+
+        <!-- ⋯ メニュー -->
+        <button class="card-menu-toggle" type="button" data-id="{{ p.id }}"
+        onclick="toggleMenu(this, event)">⋯</button>
+
+        <div class="card-menu" id="menu-{{ p.id }}">
+          <a href="{{ url_for('edit_photo', photo_id=p.id) }}">コメント編集</a>
+          <form method="post" action="{{ url_for('delete_photo', photo_id=p.id) }}"
+            onsubmit="return confirm('この写真/動画を削除しますか？');">
+            <button type="submit">削除</button>
+          </form>
+        </div>
+
         {% if p.type == "image" %}
         <img class="card-media" src="{{ url_for('uploaded_file', filename=p.filename) }}" data-type="image"
           data-index="{{ loop.index0 }}" alt="" onclick="openModalFromElement(this)">
@@ -452,9 +541,11 @@
             投稿日時: {{ p.created_at.replace("T", " ") }}
           </div>
         </div>
+
       </div>
       {% endfor %}
     </div>
+
 
   </div>
 

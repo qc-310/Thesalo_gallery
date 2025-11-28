@@ -4,7 +4,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, abort
 from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -245,6 +245,68 @@ def uploaded_file(filename):
 @app.route("/thumbs/<path:filename>")
 def thumbnail_file(filename):
     return send_from_directory(str(THUMB_FOLDER), filename)
+
+@app.route("/photo/<int:photo_id>/edit", methods=["GET", "POST"])
+def edit_photo(photo_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        # コメント更新
+        comment = request.form.get("comment", "").strip()
+        cur.execute(
+            "UPDATE photos SET comment = ? WHERE id = ?",
+            (comment, photo_id),
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for("index"))
+
+    # GET のときは編集画面表示
+    cur.execute("SELECT * FROM photos WHERE id = ?", (photo_id,))
+    photo = cur.fetchone()
+    conn.close()
+
+    if photo is None:
+        abort(404)
+
+    p_type = detect_type(photo["filename"])
+    return render_template("edit.html", photo=photo, type=p_type)
+
+@app.route("/photo/<int:photo_id>/delete", methods=["POST"])
+def delete_photo(photo_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # ファイル名とサムネ名を取得
+    cur.execute("SELECT filename, thumbnail FROM photos WHERE id = ?", (photo_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        return redirect(url_for("index"))
+
+    filename = row["filename"]
+    thumb = row["thumbnail"]
+
+    # DB から削除
+    cur.execute("DELETE FROM photos WHERE id = ?", (photo_id,))
+    conn.commit()
+    conn.close()
+
+    # 実ファイル削除（存在チェック付き）
+    file_path = UPLOAD_FOLDER / filename
+    if file_path.exists():
+        file_path.unlink()
+
+    if thumb:
+        thumb_path = THUMB_FOLDER / thumb
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
