@@ -16,9 +16,6 @@
       background: white;
       padding: 12px 16px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       position: sticky;
       top: 0;
       z-index: 10;
@@ -29,7 +26,48 @@
       margin: 0;
     }
 
+    .container {
+      padding: 12px 16px 24px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .upload-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      padding: 12px 14px 14px;
+      margin-top: 12px;
+      margin-bottom: 16px;
+    }
+
+    .upload-card h2 {
+      font-size: 16px;
+      margin: 0 0 8px;
+    }
+
+    .upload-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .upload-form input[type="file"] {
+      font-size: 14px;
+    }
+
+    .upload-form textarea {
+      width: 100%;
+      min-height: 48px;
+      font-size: 14px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      resize: vertical;
+    }
+
     .upload-btn {
+      align-self: flex-start;
       padding: 8px 14px;
       background: #007aff;
       color: white;
@@ -41,9 +79,9 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 16px;
-      padding: 16px;
+      margin-top: 8px;
     }
 
     .card {
@@ -51,52 +89,85 @@
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      transition: transform 0.06s ease;
+      display: flex;
+      flex-direction: column;
     }
 
-    .card:hover {
-      transform: scale(1.02);
-    }
-
-    .card img, .card video {
+    .card img,
+    .card video {
       width: 100%;
       height: auto;
       display: block;
     }
+
+    .card-body {
+      padding: 8px 10px 10px;
+      font-size: 13px;
+    }
+
+    .comment {
+      margin-bottom: 4px;
+      word-wrap: break-word;
+    }
+
+    .comment-empty {
+      color: #999;
+      margin-bottom: 4px;
+    }
+
+    .meta {
+      font-size: 11px;
+      color: #777;
+    }
   </style>
-
-  <script>
-    function triggerUpload() {
-      document.getElementById("fileInput").click();
-    }
-
-    function autoSubmit() {
-      document.getElementById("uploadForm").submit();
-    }
-  </script>
 </head>
 
 <body>
 
   <header>
-    <h1>テサロギャラリー</h1>
-    <button class="upload-btn" onclick="triggerUpload()">＋ 写真/動画</button>
+    <div class="container">
+      <h1>テサロギャラリー</h1>
+    </div>
   </header>
 
-  <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data" style="display:none">
-    <input id="fileInput" type="file" name="file" accept="image/*,video/*" onchange="autoSubmit()">
-  </form>
+  <div class="container">
 
-  <div class="grid">
-    {% for f in files %}
-      <div class="card">
-        {% if f.type == "image" %}
-          <img src="{{ url_for('uploaded_file', filename=f.name) }}">
-        {% elif f.type == "video" %}
-          <video controls src="{{ url_for('uploaded_file', filename=f.name) }}"></video>
-        {% endif %}
-      </div>
-    {% endfor %}
+    <!-- アップロードカード -->
+    <div class="upload-card">
+      <h2>新しい写真 / 動画を追加</h2>
+      <form class="upload-form" method="post" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*,video/*" required>
+
+        <textarea name="comment" placeholder="コメント（任意）を入力できます"></textarea>
+
+        <button class="upload-btn" type="submit">アップロード</button>
+      </form>
+    </div>
+
+    <!-- 一覧表示 -->
+    <div class="grid">
+      {% for p in photos %}
+        <div class="card">
+          {% if p.type == "image" %}
+            <img src="{{ url_for('uploaded_file', filename=p.filename) }}" alt="">
+          {% elif p.type == "video" %}
+            <video controls src="{{ url_for('uploaded_file', filename=p.filename) }}"></video>
+          {% endif %}
+
+          <div class="card-body">
+            {% if p.comment %}
+              <div class="comment">{{ p.comment }}</div>
+            {% else %}
+              <div class="comment-empty">コメントなし</div>
+            {% endif %}
+            <div class="meta">
+              投稿日時: {{ p.created_at.replace("T", " ") }}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
   </div>
 
 </body>

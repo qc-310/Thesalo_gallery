@@ -3,7 +3,7 @@ version: "3.9"
 services:
   dog-gallery:
     build: .
-    container_name: dog-gallery
+    container_name: thesalo-gallery
     ports:
       - "5000:5000"
     volumes:
