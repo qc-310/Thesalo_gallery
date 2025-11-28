@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -9,6 +10,9 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 UPLOAD_FOLDER.mkdir(exist_ok=True)
+
+THUMB_FOLDER = UPLOAD_FOLDER / "thumbs"   # サムネ保存用
+THUMB_FOLDER.mkdir(exist_ok=True)
 
 DB_PATH = BASE_DIR / "thesalo_gallery.db"
 
@@ -42,34 +46,48 @@ def init_db():
 def sync_files_with_db():
     """
     uploads フォルダにあるのに DB に登録されていないファイルを
-    自動で DB に登録する（既存ファイル救済用）
+    自動で DB に登録する + 動画はサムネも作る
     """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
-    # DBに既にあるファイル名一覧
-    cur.execute("SELECT filename FROM photos")
-    in_db = {row[0] for row in cur.fetchall()}
+    cur.execute("SELECT filename, thumbnail FROM photos")
+    in_db = {row[0]: row[1] for row in cur.fetchall()}
 
-    # uploads フォルダの実ファイル
     for name in os.listdir(UPLOAD_FOLDER):
         fpath = UPLOAD_FOLDER / name
         if not fpath.is_file():
             continue
-        if name in in_db:
-            continue
 
-        # 初回登録用にファイル更新日時を使う
-        mtime = datetime.fromtimestamp(fpath.stat().st_mtime)
-        created_at = mtime.isoformat(timespec="seconds")
+        file_type = detect_type(name)
 
-        cur.execute(
-            "INSERT OR IGNORE INTO photos (filename, created_at, comment) VALUES (?, ?, ?)",
-            (name, created_at, ""),
-        )
+        # DB未登録の場合は新規登録
+        if name not in in_db:
+            # 既存ファイルは更新日時を created_at に使う
+            mtime = datetime.fromtimestamp(fpath.stat().st_mtime)
+            created_at = mtime.isoformat(timespec="seconds")
+
+            thumb_name = None
+            if file_type == "video":
+                thumb_name = generate_video_thumbnail(name)
+
+            cur.execute(
+                "INSERT OR IGNORE INTO photos (filename, created_at, comment, thumbnail) VALUES (?, ?, ?, ?)",
+                (name, created_at, "", thumb_name),
+            )
+
+        # すでに登録済みで thumbnail が空の動画はサムネを補完
+        elif file_type == "video" and not in_db[name]:
+            thumb_name = generate_video_thumbnail(name)
+            if thumb_name:
+                cur.execute(
+                    "UPDATE photos SET thumbnail = ? WHERE filename = ?",
+                    (thumb_name, name),
+                )
 
     conn.commit()
     conn.close()
+
 
 
 def allowed_file(filename: str) -> bool:
@@ -85,9 +103,52 @@ def detect_type(filename: str) -> str:
         return "video"
     return "other"
 
+def ensure_thumbnail_column():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(photos)")
+    cols = [row[1] for row in cur.fetchall()]
+    if "thumbnail" not in cols:
+        cur.execute("ALTER TABLE photos ADD COLUMN thumbnail TEXT")
+        conn.commit()
+    conn.close()
+
+def generate_video_thumbnail(filename: str) -> str | None:
+    """
+    動画ファイルから 1 フレーム切り出してサムネ画像を作る。
+    成功したらサムネファイル名を返す / 失敗時は None。
+    """
+    video_path = UPLOAD_FOLDER / filename
+    thumb_name = f"{Path(filename).stem}_thumb.jpg"
+    thumb_path = THUMB_FOLDER / thumb_name
+
+    # すでに存在するなら作り直さない
+    if thumb_path.exists():
+        return thumb_name
+
+    # ffmpegコマンドで1秒地点のフレームを切り出し
+    cmd = [
+        "ffmpeg",
+        "-y",                # 上書き
+        "-ss", "00:00:01.000",
+        "-i", str(video_path),
+        "-vframes", "1",
+        "-q:v", "2",
+        str(thumb_path),
+    ]
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if thumb_path.exists():
+            return thumb_name
+    except Exception as e:
+        print(f"[WARN] thumbnail generation failed for {filename}: {e}")
+
+    return None
+
 
 # アプリ起動時に1回だけ実行
 init_db()
+ensure_thumbnail_column()
 sync_files_with_db()
 
 
@@ -102,8 +163,9 @@ def index():
 
     # 投稿日時の新しい順に並べる
     cur.execute(
-        "SELECT id, filename, created_at, comment FROM photos ORDER BY datetime(created_at) DESC"
-    )
+    "SELECT id, filename, created_at, comment, thumbnail FROM photos ORDER BY datetime(created_at) DESC"
+    )  
+
     photos = cur.fetchall()
     conn.close()
 
@@ -117,6 +179,7 @@ def index():
                 "filename": p["filename"],
                 "created_at": p["created_at"],
                 "comment": p["comment"] or "",
+                "thumbnail": p["thumbnail"],
                 "type": p_type,
             }
         )
@@ -139,7 +202,7 @@ def upload_file():
         filename = secure_filename(file.filename)
         save_path = UPLOAD_FOLDER / filename
 
-        # 同名ファイルがある場合は _1, _2... を付けて回避
+        # 同名回避
         if save_path.exists():
             stem = Path(filename).stem
             ext = Path(filename).suffix
@@ -153,16 +216,20 @@ def upload_file():
                 i += 1
             save_path = UPLOAD_FOLDER / filename
 
-        # ファイル保存
         file.save(str(save_path))
 
-        # DBへ登録
         created_at = datetime.now().isoformat(timespec="seconds")
+        file_type = detect_type(filename)
+
+        thumb_name = None
+        if file_type == "video":
+            thumb_name = generate_video_thumbnail(filename)
+
         conn = sqlite3.connect(DB_PATH)
         cur = conn.cursor()
         cur.execute(
-            "INSERT OR REPLACE INTO photos (filename, created_at, comment) VALUES (?, ?, ?)",
-            (filename, created_at, comment),
+            "INSERT OR REPLACE INTO photos (filename, created_at, comment, thumbnail) VALUES (?, ?, ?, ?)",
+            (filename, created_at, comment, thumb_name),
         )
         conn.commit()
         conn.close()
@@ -170,9 +237,14 @@ def upload_file():
     return redirect(url_for("index"))
 
 
+
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+@app.route("/thumbs/<path:filename>")
+def thumbnail_file(filename):
+    return send_from_directory(str(THUMB_FOLDER), filename)
 
 
 if __name__ == "__main__":

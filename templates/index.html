@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ja">
+
 <head>
   <meta charset="utf-8">
   <title>テサロギャラリー</title>
@@ -15,7 +16,7 @@
     header {
       background: white;
       padding: 12px 16px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
       position: sticky;
       top: 0;
       z-index: 10;
@@ -35,7 +36,7 @@
     .upload-card {
       background: white;
       border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
       padding: 12px 14px 14px;
       margin-top: 12px;
       margin-bottom: 16px;
@@ -53,11 +54,14 @@
     }
 
     .upload-form input[type="file"] {
-      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .upload-form textarea {
       width: 100%;
+      box-sizing: border-box;
+      /* ← はみ出し防止の決定打 */
       min-height: 48px;
       font-size: 14px;
       padding: 6px 8px;
@@ -88,17 +92,16 @@
       background: white;
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
       display: flex;
       flex-direction: column;
     }
 
-    .card img,
-    .card video {
+    /* ギャラリー内のサムネイル（画像・動画） */
+    .card .card-media {
       width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
+      height: 180px;
+      object-fit: cover;
       display: block;
     }
 
@@ -121,7 +124,282 @@
       font-size: 11px;
       color: #777;
     }
+
+    /* ===== 拡大表示モーダル ===== */
+    .modal {
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      /* ← 余白なしで画面ぴったり */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(0, 0, 0, 0.8);
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-inner {
+      /* これが画面いっぱいにならないことが重要 */
+      max-width: 90%;
+      max-height: 70vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-media {
+      max-width: 90%;
+      /* 画面の9割まで */
+      max-height: 70vh;
+      /* 高さも少し小さめに */
+      object-fit: contain;
+      border-radius: 12px;
+      background: #000;
+
+      /* フェード用 */
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      /* 0.25秒でふわっと */
+    }
+
+    /* 表示中のメディアに付与するクラス */
+    .modal-media.visible {
+      opacity: 1;
+    }
+
+    /* 動画サムネ用のラッパー & オーバーレイ */
+    .media-wrapper {
+      position: relative;
+    }
+
+    .video-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      pointer-events: none;
+      /* クリックを動画に通す */
+    }
+
+    .video-play-icon {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 18px;
+      pointer-events: none;
+      /* クリックは動画に届く */
+    }
+
+
+    .close-btn {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      color: #fff;
+      font-size: 32px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    .nav-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 40px;
+      border-radius: 20px;
+      border: none;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+    }
+
+    .nav-btn.prev {
+      left: 12px;
+    }
+
+    .nav-btn.next {
+      right: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .nav-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+      }
+    }
   </style>
+
+  <script>
+    let currentIndex = null;
+    let mediaItems = [];
+    let touchStartX = 0;
+    let touchStartY = 0;  // ← 縦方向も見るため追加
+
+    function clearMediaVisibility() {
+      document.getElementById('modal-img').classList.remove('visible');
+      document.getElementById('modal-video').classList.remove('visible');
+    }
+
+    function initMediaItems() {
+      const elements = document.querySelectorAll('.card-media');
+      mediaItems = Array.from(elements).map(el => ({
+        // data-src があればそれを優先（動画はここに本物の動画URLを入れる）
+        src: el.dataset.src || el.currentSrc || el.src,
+        type: el.dataset.type
+      }));
+    }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initMediaItems();
+
+      const modal = document.getElementById('modal');
+      modal.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+        }
+      });
+
+      modal.addEventListener('touchend', (e) => {
+        if (!touchStartX && !touchStartY) return;
+
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const dx = endX - touchStartX;
+        const dy = endY - touchStartY;
+
+        const threshold = 80; // ← これで「しっかりスワイプしないと反応しない」
+
+        // 横方向の方が大きく、しきい値も超えたときだけスワイプ
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
+          if (dx < 0) {
+            showNext();
+          } else {
+            showPrev();
+          }
+        }
+
+        touchStartX = 0;
+        touchStartY = 0;
+      });
+    });
+
+    function openModalFromElement(el) {
+      if (!mediaItems.length) {
+        initMediaItems();
+      }
+      currentIndex = parseInt(el.dataset.index, 10);
+      showCurrent();
+    }
+
+    function showCurrent() {
+      if (currentIndex == null || currentIndex < 0 || currentIndex >= mediaItems.length) return;
+
+      const item = mediaItems[currentIndex];
+      const modal = document.getElementById('modal');
+      const img = document.getElementById('modal-img');
+      const video = document.getElementById('modal-video');
+
+      clearMediaVisibility();  // 前のvisibleを外す
+
+      if (item.type === 'image') {
+        img.style.display = 'block';
+        video.pause();
+        video.style.display = 'none';
+        img.src = item.src;
+      } else {
+        video.style.display = 'block';
+        img.style.display = 'none';
+        video.src = item.src;
+      }
+
+      modal.classList.add('show');  // モーダル自体を表示
+
+      // 次のフレームでvisibleを付けてフェードイン
+      setTimeout(() => {
+        if (item.type === 'image') {
+          img.classList.add('visible');
+        } else {
+          video.classList.add('visible');
+        }
+      }, 20);
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modal');
+      const video = document.getElementById('modal-video');
+      modal.classList.remove('show');
+      video.pause();
+      clearMediaVisibility();
+    }
+
+    function showNext(event) {
+      if (event) event.stopPropagation();
+      if (currentIndex == null) return;
+      currentIndex = (currentIndex + 1) % mediaItems.length;
+      showCurrent();
+    }
+
+    function showPrev(event) {
+      if (event) event.stopPropagation();
+      if (currentIndex == null) return;
+      currentIndex = (currentIndex - 1 + mediaItems.length) % mediaItems.length;
+      showCurrent();
+    }
+
+    function onModalBackgroundClick(e) {
+      const inner = document.querySelector('.modal-inner');
+      if (!inner) return;
+
+      const rect = inner.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+
+      // 画像・動画を含む「白いカード」領域の外をタップしたら閉じる
+      const isOutside =
+        x < rect.left ||
+        x > rect.right ||
+        y < rect.top ||
+        y > rect.bottom;
+
+      if (isOutside) {
+        closeModal();
+      }
+    }
+  </script>
 </head>
 
 <body>
@@ -136,12 +414,10 @@
 
     <!-- アップロードカード -->
     <div class="upload-card">
-      <h2>新しい写真 / 動画を追加</h2>
+      <h2>テサロの写真 / 動画を追加</h2>
       <form class="upload-form" method="post" action="/upload" enctype="multipart/form-data">
         <input type="file" name="file" accept="image/*,video/*" required>
-
         <textarea name="comment" placeholder="コメント（任意）を入力できます"></textarea>
-
         <button class="upload-btn" type="submit">アップロード</button>
       </form>
     </div>
@@ -149,28 +425,50 @@
     <!-- 一覧表示 -->
     <div class="grid">
       {% for p in photos %}
-        <div class="card">
-          {% if p.type == "image" %}
-            <img src="{{ url_for('uploaded_file', filename=p.filename) }}" alt="">
-          {% elif p.type == "video" %}
-            <video controls src="{{ url_for('uploaded_file', filename=p.filename) }}"></video>
-          {% endif %}
+      <div class="card">
+        {% if p.type == "image" %}
+        <img class="card-media" src="{{ url_for('uploaded_file', filename=p.filename) }}" data-type="image"
+          data-index="{{ loop.index0 }}" alt="" onclick="openModalFromElement(this)">
+        {% elif p.type == "video" %}
+        {% set thumb = p.thumbnail
+        and url_for('thumbnail_file', filename=p.thumbnail)
+        or url_for('uploaded_file', filename=p.filename) %}
+        <div class="media-wrapper">
+          <img class="card-media" src="{{ thumb }}" data-type="video" data-index="{{ loop.index0 }}"
+            data-src="{{ url_for('uploaded_file', filename=p.filename) }}" alt="動画のサムネイル"
+            onclick="openModalFromElement(this)">
+          <div class="video-play-icon">▶</div>
+          <div class="video-badge">動画</div>
+        </div>
+        {% endif %}
 
-          <div class="card-body">
-            {% if p.comment %}
-              <div class="comment">{{ p.comment }}</div>
-            {% else %}
-              <div class="comment-empty">コメントなし</div>
-            {% endif %}
-            <div class="meta">
-              投稿日時: {{ p.created_at.replace("T", " ") }}
-            </div>
+        <div class="card-body">
+          {% if p.comment %}
+          <div class="comment">{{ p.comment }}</div>
+          {% else %}
+          <div class="comment-empty">コメントなし</div>
+          {% endif %}
+          <div class="meta">
+            投稿日時: {{ p.created_at.replace("T", " ") }}
           </div>
         </div>
+      </div>
       {% endfor %}
     </div>
 
   </div>
 
+  <!-- ===== 拡大表示モーダル ===== -->
+  <div id="modal" class="modal" onclick="onModalBackgroundClick(event)">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <div class="modal-inner">
+      <img id="modal-img" class="modal-media" />
+      <video id="modal-video" class="modal-media" controls playsinline></video>
+    </div>
+    <button class="nav-btn prev" onclick="showPrev(event)">&#10094;</button>
+    <button class="nav-btn next" onclick="showNext(event)">&#10095;</button>
+  </div>
+
 </body>
+
 </html>
