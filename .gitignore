@@ -1,0 +1,29 @@
+# アップロードファイルはGit対象外
+uploads/
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+
+# 仮想環境（作る場合）
+venv/
+.env
+
+# OS系
+.DS_Store
+Thumbs.db
+
+# Tunnel binary
+cloudflared.exe
+cloudflared-windows-amd64.exe
+
+# Database
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+
+# Editor directories
+.idea/
+.vscode/

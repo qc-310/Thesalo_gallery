@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  dog-gallery:
+    build: .
+    container_name: thesalo-gallery
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - GOOGLE_CLIENT_ID=657984841308-15dupong7ijvrqjnpnbl1avh004e4605.apps.googleusercontent.com
+      - GOOGLE_CLIENT_SECRET=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
+      # Comma separated list of allowed emails. If empty, all Google accounts are allowed (not recommended).
+      - ALLOWED_EMAILS=
+      - ADMIN_EMAILS=q.official310@gmail.com,syunta12100703@gmail.com
+      # For production, replace with a random string
+      - FLASK_SECRET_KEY=dev_secret_key_change_in_prod
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
