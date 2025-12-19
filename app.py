@@ -29,7 +29,9 @@ ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+
 app = Flask(__name__)
+app.config['VERSION'] = '1.1.0'
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super_secret_key")
@@ -443,14 +445,17 @@ def upload_file():
     if not files or files[0].filename == "":
         return redirect(url_for("index"))
 
-    # zip でファイルとコメントを同時にループ
-    # コメント数がファイル数より少ない場合（またはその逆）は min(len) になるが
-    # フロントエンドで対になるように生成しているので基本一致するはず
-    # 足りない場合は空文字で埋めるロジックを入れると安全
     import itertools
     for file, comment in itertools.zip_longest(files, comments, fillvalue=""):
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
+            file_type = detect_type(filename)
+            
+            # HEICの場合は拡張子を .jpg に変更して保存する準備
+            if file_type == "image":
+                 stem = Path(filename).stem
+                 filename = f"{stem}.jpg"
+
             save_path = UPLOAD_FOLDER / filename
 
             # 同名回避
@@ -466,23 +471,20 @@ def upload_file():
                         break
                     i += 1
                 save_path = UPLOAD_FOLDER / filename
-
-            file.save(str(save_path))
+            
+            # 画像ならリサイズ・圧縮処理、動画ならそのまま保存
+            captured_at = None
+            thumb_name = None
+            
+            if file_type == "image":
+                captured_at = process_image(file, save_path)
+            else:
+                file.save(str(save_path))
+                if file_type == "video":
+                    thumb_name = generate_video_thumbnail(filename)
 
             created_at = datetime.now().isoformat(timespec="seconds")
-            file_type = detect_type(filename)
-
-            thumb_name = None
-            captured_at = None
-
-            if file_type == "image":
-                # EXIF取得
-                captured_at = get_exif_date(save_path)
-
-            if file_type == "video":
-                thumb_name = generate_video_thumbnail(filename)
-                # 動画の撮影日時取得はライブラリ依存が激しいため今回は省略（作成日時=アップロード日時とする）
-
+            
             conn = sqlite3.connect(DB_PATH)
             cur = conn.cursor()
             cur.execute(
@@ -491,6 +493,81 @@ def upload_file():
             )
             conn.commit()
             conn.close()
+
+    return redirect(url_for("index"))
+
+def process_image(file_storage, save_path) -> str | None:
+    """
+    画像を読み込み、リサイズ・圧縮して保存する。
+    戻り値: EXIFから取得した撮影日時 (なければ None)
+    """
+    try:
+        image = Image.open(file_storage)
+        
+        # EXIF取得 (保存前に取る)
+        exif_date = None
+        exif_bytes = b""
+        
+        if "exif" in image.info:
+            exif_bytes = image.info["exif"]
+            # 既存の get_exif_date ロジックを再利用したいが、ファイルパス依存なので
+            # ここでは簡易的に取得するか、保存後に再取得するか。
+            # 効率のため、Imageオブジェクトから直接取得するヘルパーがあると良いが
+            # 今回は既存の get_exif_date がパスを受け取る仕様なので
+            # いったんメモリオンリーで日付を取るロジックを流用する
+            exif = image._getexif()
+            if exif:
+                 tags = {
+                    36867: 'DateTimeOriginal',
+                    36868: 'DateTimeDigitized',
+                    306: 'DateTime'
+                }
+                 for tag_id, name in tags.items():
+                    if tag_id in exif:
+                        value = exif[tag_id]
+                        try:
+                            exif_date = value.replace(":", "-", 2).replace(" ", "T")
+                            break
+                        except:
+                            continue
+
+        # リサイズ (MAX_IMAGE_SIZE)
+        max_size = int(os.environ.get("MAX_IMAGE_SIZE", 1920))
+        
+        # 画像の向き(Orientation)を直す
+        from PIL import ImageOps
+        image = ImageOps.exif_transpose(image)
+        
+        # サイズ計算
+        if max(image.size) > max_size:
+            ratio = max_size / max(image.size)
+            new_size = (int(image.width * ratio), int(image.height * ratio))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            
+        # JPEG変換 (HEIC対策含む)
+        if image.mode in ("RGBA", "P"):
+            image = image.convert("RGB")
+            
+        # 保存 (EXIFがあれば維持したいが、exif_transposeするとEXIFはずれることがある)
+        # resize/transposeをした場合、元のバイナリEXIFをそのままつけるとOrientationが二重適用される可能性がある
+        # しかし撮影日時は維持したい。
+        # シンプルに「画質85のJPEG」として保存。
+        # Orientationだけは上記 exif_transpose で焼き込まれているので、
+        # 保存時の exif 引数に古い exif_bytes を渡すとまた回転してしまう恐れがある。
+        # よって、今回は「撮影日時はDBに入れるので、ファイル内のEXIFは必須ではない」という割り切りで
+        # EXIFを付けずに保存するか、あるいは日付タグだけ残すのが理想。
+        # 簡易実装: EXIFはDB保存用に取得済みなので、生成画像にはEXIFを付けない、または最小限にする。
+        
+        image.save(str(save_path), "JPEG", quality=85, optimize=True)
+        
+        return exif_date
+
+    except Exception as e:
+        print(f"Image processing failed: {e}")
+        # 失敗したらそのまま保存（フォールバック）
+        file_storage.seek(0)
+        file_storage.save(str(save_path))
+        return None
 
     return redirect(url_for("index"))
 
