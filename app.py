@@ -3,9 +3,17 @@ import sqlite3
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from pathlib import Path
+from PIL import Image, ExifTags
+import pillow_heif
 
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory, abort
+# Register HEIF opener
+pillow_heif.register_heif_opener()
+
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, abort, session
 from werkzeug.utils import secure_filename
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from authlib.integrations.flask_client import OAuth
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_FOLDER = BASE_DIR / "uploads"
@@ -19,9 +27,107 @@ DB_PATH = BASE_DIR / "thesalo_gallery.db"
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".heic"}
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
 
-app = Flask(__name__)
-app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+app.config["UPLOAD_FOLDER"] = str(UPLOAD_FOLDER)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super_secret_key")
+
+# Cookie Settings for Cloudflare/HTTPS
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+# --- Auth Setup ---
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login_page"
+
+oauth = OAuth(app)
+google = oauth.register(
+    name='google',
+    client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+    client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'},
+)
+
+# User Model (Simple)
+class User(UserMixin):
+    def __init__(self, id, email, name, is_admin=False):
+        self.id = id
+        self.email = email
+        self.name = name
+        self.is_admin = is_admin
+
+@login_manager.user_loader
+def load_user(user_id):
+    user_info = session.get('user_info')
+    if not user_info:
+        return None
+    # Match against 'sub' or 'id'
+    session_id = user_info.get('sub') or user_info.get('id')
+    if user_id == session_id:
+        email = user_info.get('email')
+        is_admin = is_admin_email(email)
+        return User(session_id, email, user_info['name'], is_admin)
+    return None
+
+def is_admin_email(email: str) -> bool:
+    admin_emails_str = os.environ.get("ADMIN_EMAILS", "")
+    if not admin_emails_str:
+        return False
+    admins = [e.strip() for e in admin_emails_str.split(",") if e.strip()]
+    return email in admins
+
+# --- Auth Routes ---
+@app.route("/login_page")
+def login_page():
+    return render_template("login.html")
+
+@app.route("/login")
+def login():
+    redirect_uri = url_for('authorize', _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route("/callback")
+def authorize():
+    try:
+        token = google.authorize_access_token()
+    except Exception as e:
+        # Handle cases where user rejected request or other OAuth errors
+        return redirect(url_for('login_page'))
+
+    # google.get('userinfo') failed because api_base_url is not set in server_metadata_url mode
+    # We must use the absolute URL or rely on id_token (if parsed automatically, but let's stick to explicit fetch)
+    resp = google.get('https://openidconnect.googleapis.com/v1/userinfo')
+    user_info = resp.json()
+    session['user_info'] = user_info
+    # Google OIDC uses 'sub' as the unique identifier
+    user_id = user_info.get('sub') or user_info.get('id')
+    user_email = user_info.get('email')
+
+    # Basic Email Restriction (Only if configured)
+    allowed_emails_str = os.environ.get("ALLOWED_EMAILS", "")
+    if allowed_emails_str:
+        allowed = [e.strip() for e in allowed_emails_str.split(",") if e.strip()]
+        if allowed and user_email not in allowed:
+            # Not allowed
+            return "Access Denied: Your email is not on the allowlist.", 403
+
+    is_admin = is_admin_email(user_email)
+    user = User(user_id, user_email, user_info['name'], is_admin)
+    login_user(user)
+    return redirect(url_for('index'))
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    session.pop('user_info', None)
+    return redirect(url_for('login_page'))
 
 # =========================
 # DB 初期化 & 同期
@@ -35,6 +141,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT UNIQUE NOT NULL,
             created_at TEXT NOT NULL,
+            captured_at TEXT,
             comment TEXT
         )
         """
@@ -103,14 +210,94 @@ def detect_type(filename: str) -> str:
         return "video"
     return "other"
 
-def ensure_thumbnail_column():
+def get_exif_date(file_path):
+    """
+    画像ファイルからEXIFの撮影日時を取得する。
+    取得失敗や情報がない場合は None を返す。
+    """
+    try:
+        with Image.open(file_path) as image:
+            exif = image._getexif()
+            if not exif:
+                return None
+            
+            # DateTimeOriginal (36867) -> DateTimeDigitized (36868) -> DateTime (306) の順で探す
+            tags = {
+                36867: 'DateTimeOriginal',
+                36868: 'DateTimeDigitized',
+                306: 'DateTime'
+            }
+            
+            for tag_id, name in tags.items():
+                if tag_id in exif:
+                    value = exif[tag_id]
+                    # Format: "YYYY:MM:DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
+                    try:
+                        return value.replace(":", "-", 2).replace(" ", "T")
+                    except:
+                        continue
+    except Exception as e:
+        # ログにエラーを出力してデバッグしやすくする
+        print(f"EXIF extraction failed for {file_path}: {e}")
+        pass
+    return None
+
+def perform_exif_scan():
+    """
+    既存の画像のEXIFを再スキャンしてDBを更新する（内部処理用）
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    # captured_at が NULL の画像を取得
+    cur.execute("SELECT id, filename FROM photos WHERE captured_at IS NULL")
+    rows = cur.fetchall()
+    
+    count = 0
+    for row in rows:
+        photo_id = row['id']
+        filename = row['filename']
+        file_path = UPLOAD_FOLDER / filename
+        
+        file_type = detect_type(filename)
+        if file_type == 'image' and file_path.exists():
+            date = get_exif_date(file_path)
+            if date:
+                cur.execute("UPDATE photos SET captured_at = ? WHERE id = ?", (date, photo_id))
+                count += 1
+    
+    conn.commit()
+    conn.close()
+    return len(rows), count
+
+@app.route("/api/scan_exif")
+@login_required
+def scan_exif():
+    if not current_user.is_admin:
+        return "Access Denied: Admin privileges required.", 403
+    
+    total, updated = perform_exif_scan()
+    return f"Scanned {total} photos, updated {updated}."
+
+def ensure_columns():
+    """
+    既存テーブルに新しいカラムを追加するマイグレーション関数
+    """
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     cur.execute("PRAGMA table_info(photos)")
     cols = [row[1] for row in cur.fetchall()]
+    
+    # thumbnail カラム追加
     if "thumbnail" not in cols:
         cur.execute("ALTER TABLE photos ADD COLUMN thumbnail TEXT")
-        conn.commit()
+    
+    # captured_at カラム追加
+    if "captured_at" not in cols:
+        cur.execute("ALTER TABLE photos ADD COLUMN captured_at TEXT")
+        
+    conn.commit()
     conn.close()
 
 def generate_video_thumbnail(filename: str) -> str | None:
@@ -146,24 +333,34 @@ def generate_video_thumbnail(filename: str) -> str | None:
     return None
 
 
-# アプリ起動時に1回だけ実行
+# アプリ起動時に実行
 init_db()
-ensure_thumbnail_column()
+ensure_columns()
 sync_files_with_db()
+perform_exif_scan()
 
 
 # =========================
 # ルーティング
 # =========================
 @app.route("/", methods=["GET"])
+@login_required
 def index():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    # 投稿日時の新しい順に並べる
+    # 初期表示: 24件だけ取得
+    limit = 24
+    offset = 0
     cur.execute(
-    "SELECT id, filename, created_at, comment, thumbnail FROM photos ORDER BY datetime(created_at) DESC"
+        """
+        SELECT id, filename, created_at, captured_at, comment, thumbnail 
+        FROM photos 
+        ORDER BY datetime(COALESCE(captured_at, created_at)) DESC, id DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset)
     )  
 
     photos = cur.fetchall()
@@ -178,61 +375,122 @@ def index():
                 "id": p["id"],
                 "filename": p["filename"],
                 "created_at": p["created_at"],
+                "captured_at": p["captured_at"],
                 "comment": p["comment"] or "",
                 "thumbnail": p["thumbnail"],
                 "type": p_type,
             }
         )
 
-    return render_template("index.html", photos=photo_list)
+    return render_template("index.html", photos=photo_list, user=current_user)
+
+@app.route("/api/photos")
+@login_required
+def api_photos():
+    page = request.args.get("page", 1, type=int)
+    limit = 24
+    offset = (page - 1) * limit
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, filename, created_at, captured_at, comment, thumbnail 
+        FROM photos 
+        ORDER BY datetime(COALESCE(captured_at, created_at)) DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset)
+    )
+    photos = cur.fetchall()
+    conn.close()
+
+    data = []
+    for p in photos:
+        p_type = detect_type(p["filename"])
+        data.append({
+            "id": p["id"],
+            "filename": p["filename"],
+            "comment": p["comment"] or "",
+            "thumbnail": p["thumbnail"],
+            "type": p_type,
+            # URLを生成して返す
+            "url": url_for('uploaded_file', filename=p['filename']),
+            "thumb_url": url_for('thumbnail_file', filename=p['thumbnail']) if p['thumbnail'] else None,
+            "edit_url": url_for('edit_photo', photo_id=p['id']),
+            "delete_url": url_for('delete_photo', photo_id=p['id'])
+        })
+    
+    return {"photos": data, "has_next": len(data) == limit}
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_file():
+    if not current_user.is_admin:
+        return "Access Denied: Admin privileges required.", 403
+
     if "file" not in request.files:
         return redirect(url_for("index"))
 
-    file = request.files["file"]
-    comment = request.form.get("comment", "").strip()
+    files = request.files.getlist("file")
+    # フロントエンドが動的に生成する comments リストを受け取る
+    # input elements with name="comments"
+    comments = request.form.getlist("comments")
 
-    if file.filename == "":
+    if not files or files[0].filename == "":
         return redirect(url_for("index"))
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        save_path = UPLOAD_FOLDER / filename
-
-        # 同名回避
-        if save_path.exists():
-            stem = Path(filename).stem
-            ext = Path(filename).suffix
-            i = 1
-            while True:
-                new_name = f"{stem}_{i}{ext}"
-                save_path = UPLOAD_FOLDER / new_name
-                if not save_path.exists():
-                    filename = new_name
-                    break
-                i += 1
+    # zip でファイルとコメントを同時にループ
+    # コメント数がファイル数より少ない場合（またはその逆）は min(len) になるが
+    # フロントエンドで対になるように生成しているので基本一致するはず
+    # 足りない場合は空文字で埋めるロジックを入れると安全
+    import itertools
+    for file, comment in itertools.zip_longest(files, comments, fillvalue=""):
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
             save_path = UPLOAD_FOLDER / filename
 
-        file.save(str(save_path))
+            # 同名回避
+            if save_path.exists():
+                stem = Path(filename).stem
+                ext = Path(filename).suffix
+                i = 1
+                while True:
+                    new_name = f"{stem}_{i}{ext}"
+                    save_path = UPLOAD_FOLDER / new_name
+                    if not save_path.exists():
+                        filename = new_name
+                        break
+                    i += 1
+                save_path = UPLOAD_FOLDER / filename
 
-        created_at = datetime.now().isoformat(timespec="seconds")
-        file_type = detect_type(filename)
+            file.save(str(save_path))
 
-        thumb_name = None
-        if file_type == "video":
-            thumb_name = generate_video_thumbnail(filename)
+            created_at = datetime.now().isoformat(timespec="seconds")
+            file_type = detect_type(filename)
 
-        conn = sqlite3.connect(DB_PATH)
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT OR REPLACE INTO photos (filename, created_at, comment, thumbnail) VALUES (?, ?, ?, ?)",
-            (filename, created_at, comment, thumb_name),
-        )
-        conn.commit()
-        conn.close()
+            thumb_name = None
+            captured_at = None
+
+            if file_type == "image":
+                # EXIF取得
+                captured_at = get_exif_date(save_path)
+
+            if file_type == "video":
+                thumb_name = generate_video_thumbnail(filename)
+                # 動画の撮影日時取得はライブラリ依存が激しいため今回は省略（作成日時=アップロード日時とする）
+
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            cur.execute(
+                "INSERT OR REPLACE INTO photos (filename, created_at, captured_at, comment, thumbnail) VALUES (?, ?, ?, ?, ?)",
+                (filename, created_at, captured_at, comment.strip(), thumb_name),
+            )
+            conn.commit()
+            conn.close()
 
     return redirect(url_for("index"))
 
@@ -247,7 +505,10 @@ def thumbnail_file(filename):
     return send_from_directory(str(THUMB_FOLDER), filename)
 
 @app.route("/photo/<int:photo_id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_photo(photo_id: int):
+    if not current_user.is_admin:
+        return "Access Denied: Admin privileges required.", 403
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -275,7 +536,10 @@ def edit_photo(photo_id: int):
     return render_template("edit.html", photo=photo, type=p_type)
 
 @app.route("/photo/<int:photo_id>/delete", methods=["POST"])
+@login_required
 def delete_photo(photo_id: int):
+    if not current_user.is_admin:
+        return "Access Denied: Admin privileges required.", 403
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
