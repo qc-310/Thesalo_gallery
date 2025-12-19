@@ -1,4 +1,4 @@
-# Thesalo Gallery
+# Thesalo Gallery v1.1.0
 
 Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュアな写真・動画共有ギャラリーです。
 家族や友人との思い出共有を目的として設計されており、管理者は写真のアップロードや編集ができ、ゲストは閲覧のみが可能です。
