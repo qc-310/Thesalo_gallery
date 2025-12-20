@@ -5,6 +5,12 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.0.0/) に基づいており、
 このプロジェクトは [Semantic Versioning](https://semver.org/lang/ja/) に準拠しています。
 
+## [1.1.1] - 2025-12-20
+
+### 開発環境 (Dev)
+- **DevContainer**: VS Code DevContainerに対応しました。`Reopen in Container` で開発環境を即座に構築できます。
+- **Dockerfile**: ビルド依存関係 (`wget`) を修正しました。
+
 ## [1.1.0] - 2025-12-19
 
 ### 追加 (Added)
