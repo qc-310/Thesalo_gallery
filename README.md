@@ -5,32 +5,32 @@ Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュ�
 
 ## 主な機能
 
-*   **Google認証**: セキュアなログイン機能。
-*   **権限管理 (RBAC)**:
-    *   **管理者 (Admin)**: 写真のアップロード、編集、削除が可能。
-    *   **ゲスト (Guest)**: 閲覧のみ可能（アップロード等は不可）。
-*   **マルチアップロード**: 複数の写真・動画を一度にドラッグ＆ドロップでアップロード。
-*   **個別コメント**: アップロード時に、写真一枚一枚に対してコメント入力が可能。
-*   **EXIF対応**: 写真の撮影日時（EXIF情報）を自動取得し、撮影日順に並び替え。
-    *   アプリ起動時に自動で未取得ファイルをスキャン・修正します。
-*   **無限スクロール**: 大量の写真もスムーズに閲覧可能。
-*   **動画対応**: 動画のアップロードおよびサムネイル自動生成 (ffmpeg使用)。
-*   **モバイルフレンドリー**: スマートフォンでの閲覧・操作に最適化されたUI。
+* **Google認証**: セキュアなログイン機能。
+* **権限管理 (RBAC)**:
+  * **管理者 (Admin)**: 写真のアップロード、編集、削除が可能。
+  * **ゲスト (Guest)**: 閲覧のみ可能（アップロード等は不可）。
+* **マルチアップロード**: 複数の写真・動画を一度にドラッグ＆ドロップでアップロード。
+* **個別コメント**: アップロード時に、写真一枚一枚に対してコメント入力が可能。
+* **EXIF対応**: 写真の撮影日時（EXIF情報）を自動取得し、撮影日順に並び替え。
+  * アプリ起動時に自動で未取得ファイルをスキャン・修正します。
+* **無限スクロール**: 大量の写真もスムーズに閲覧可能。
+* **動画対応**: 動画のアップロードおよびサムネイル自動生成 (ffmpeg使用)。
+* **モバイルフレンドリー**: スマートフォンでの閲覧・操作に最適化されたUI。
 
 ## 必要要件
 
-*   Docker / Docker Compose
-*   Google Cloud Platform プロジェクト (OAuth 2.0 クライアントIDが必要)
+* Docker / Docker Compose
+* Google Cloud Platform プロジェクト (OAuth 2.0 クライアントIDが必要)
 
 ## セットアップ手順
 
 ### 1. Google OAuth の設定
 
-1.  Google Cloud Console でプロジェクトを作成。
-2.  「APIとサービス」>「認証情報」から **OAuth クライアント ID** を作成。
-3.  **承認済みのリダイレクト URI** に以下を設定:
-    *   ローカル: `http://localhost:5000/callback`
-    *   本番 (Cloudflare Tunnel等): `https://your-domain.com/callback`
+1. Google Cloud Console でプロジェクトを作成。
+2. 「APIとサービス」>「認証情報」から **OAuth クライアント ID** を作成。
+3. **承認済みのリダイレクト URI** に以下を設定:
+    * ローカル: `http://localhost:5000/callback`
+    * 本番 (Cloudflare Tunnel等): `https://your-domain.com/callback`
 
 ### 2. 環境変数の設定 (`docker-compose.yml`)
 
@@ -62,27 +62,41 @@ docker-compose up --build -d
 
 起動後、`http://localhost:5000` (または設定したドメイン) にアクセスしてください。
 
+## ローカル開発ワークフロー
+
+コードの変更を行い、テスト・動作確認を行う手順は以下の通りです。
+
+1. コードを編集します。
+2. コンテナを再ビルドして起動します:
+
+    ```bash
+    docker-compose up --build -d
+    ```
+
+    ※ `--build` フラグを付けることで、コード変更を含んだ新しいイメージが作成されます。
+3. `docker-compose logs -f` でログを確認して、エラーが出ていないかチェックします。
+
 ## 運用について
 
-*   **データのバックアップ**:
-    *   `uploads/`: 写真・動画の実体
-    *   `thesalo_gallery.db`: データベース（メタデータ、コメント）
-    *   これらを定期的にバックアップしてください。
-*   **権限の変更**:
-    *   管理者を増やしたい場合は、`docker-compose.yml` の `ADMIN_EMAILS` に追記し、コンテナを再起動してください。
+* **データのバックアップ**:
+  * `uploads/`: 写真・動画の実体
+  * `thesalo_gallery.db`: データベース（メタデータ、コメント）
+  * これらを定期的にバックアップしてください。
+* **権限の変更**:
+  * 管理者を増やしたい場合は、`docker-compose.yml` の `ADMIN_EMAILS` に追記し、コンテナを再起動してください。
 
 ## 技術スタック
 
-*   **Backend**: Python 3.11 (Flask)
-*   **Database**: SQLite
-*   **Frontend**: HTML5, CSS3 (Grid Layout), Vanilla JS
-*   **Auth**: Authlib (OpenID Connect)
-*   **Image Processing**: Pillow, pillow-heif (HEIC対応)
-*   **Video Processing**: ffmpeg
+* **Backend**: Python 3.11 (Flask)
+* **Database**: SQLite
+* **Frontend**: HTML5, CSS3 (Grid Layout), Vanilla JS
+* **Auth**: Authlib (OpenID Connect)
+* **Image Processing**: Pillow, pillow-heif (HEIC対応)
+* **Video Processing**: ffmpeg
 
 ## ディレクトリ構成
 
-```
+```text
 .
 ├── app.py                # メインアプリケーション
 ├── Dockerfile            # Docker環境定義
