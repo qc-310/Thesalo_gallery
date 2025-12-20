@@ -1,0 +1,32 @@
+{
+    "name": "Thesalo Gallery Dev",
+    "dockerComposeFile": [
+        "../docker-compose.yml",
+        "docker-compose.yml"
+    ],
+    "service": "dog-gallery",
+    "workspaceFolder": "/app",
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": "true",
+            "upgradePackages": "false",
+            "uid": "1000",
+            "gid": "1000",
+            "installOhMyZsh": "true",
+            "nonFreePackages": "true"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "njpwerner.autodocstring"
+            ]
+        }
+    },
+    "forwardPorts": [
+        5000
+    ]
+}
