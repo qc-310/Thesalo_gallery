@@ -1,119 +1,76 @@
-<!doctype html>
-<html lang="ja">
+{% extends "base.html" %}
 
-<head>
-  <meta charset="utf-8">
-  <title>Thesalo Gallery</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
+{% block content %}
 
-<body>
+<!-- Upload Card -->
+<div class="upload-card">
+  <div class="upload-title">
+    <h3>新しい写真・動画を追加</h3>
+  </div>
+  <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
+    enctype="multipart/form-data">
+    <!-- Family Select Logic could go here if multiple families -->
 
-  <header>
-    <div class="header-container">
-      <div class="logo">
-        📷 Thesalo Gallery
-      </div>
-      <div>
-        {% if current_user.is_authenticated %}
-        <span style="font-size: 14px; margin-right: 10px; color: #666;">
-          ログイン中: {{ current_user.name }} ({{ current_user.email }})
-        </span>
-        <a href="{{ url_for('auth.logout') }}"
-          style="font-size: 14px; text-decoration: none; color: #666; background: #eee; padding: 6px 12px; border-radius: 20px;">ログアウト</a>
-        {% endif %}
-      </div>
-    </div>
-  </header>
+    <label class="btn btn-secondary file-input-wrapper">
+      <span>📁 ファイルを選択...</span>
+      <input type="file" name="file" id="file-input" class="file-input" accept="image/*,video/*" multiple required
+        style="position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;">
+    </label>
 
-  <div class="container">
-
-    <!-- Upload Card -->
-    <div class="upload-card">
-      <div class="upload-title">
-        <h3>新しい写真・動画を追加</h3>
-      </div>
-      <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
-        enctype="multipart/form-data">
-        <!-- Family Select Logic could go here if multiple families -->
-
-        <label class="btn btn-secondary file-input-wrapper">
-          <span>📁 ファイルを選択...</span>
-          <input type="file" name="file" id="file-input" class="file-input" accept="image/*,video/*" multiple required
-            style="position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;">
-        </label>
-
-        <!-- File Preview Container -->
-        <div id="file-preview-container"
-          style="display:none; margin-top: 10px; text-align: center; background: #f0f0f0; padding: 10px; border-radius: 8px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
-        </div>
-
-        <button id="upload-btn" class="btn btn-primary" type="submit">アップロード</button>
-      </form>
+    <!-- File Preview Container -->
+    <div id="file-preview-container"
+      style="display:none; margin-top: 10px; text-align: center; background: #f0f0f0; padding: 10px; border-radius: 8px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
     </div>
 
-    <!-- Masonry Grid -->
-    <div class="masonry-grid">
-      {% for m in media_list %}
-      <div class="grid-item fade-in" style="animation-delay: {{ loop.index0 * 0.05 }}s" data-id="{{ m.id }}">
+    <button id="upload-btn" class="btn btn-primary" type="submit">アップロード</button>
+  </form>
+</div>
 
-        <!-- Menu -->
-        <!-- Logic for edit/delete pending implementation in media_bp -->
-        <!-- 
+<!-- Masonry Grid -->
+<div class="masonry-grid">
+  {% for m in media_list %}
+  <div class="grid-item fade-in" style="animation-delay: {{ loop.index0 * 0.05 }}s" data-id="{{ m.id }}">
+
+    <!-- Menu -->
+    <!-- Logic for edit/delete pending implementation in media_bp -->
+    <!-- 
         <button class="menu-btn" type="button">⋯</button>
         <div class="menu-dropdown">
            ...
         </div>
         -->
 
-        <!-- Media -->
-        <!-- Determine type helper in template or model property -->
-        {% set m_type = 'video' if m.mime_type.startswith('video') else 'image' %}
+    <!-- Media -->
+    <!-- Determine type helper in template or model property -->
+    {% set m_type = 'video' if m.mime_type.startswith('video') else 'image' %}
 
-        <div class="media-wrapper media-trigger" data-type="{{ m_type }}"
-          data-src="{{ url_for('media.serve_file', filename=m.filename) }}" onclick="openLightbox({{ loop.index0 }})">
+    <div class="media-wrapper media-trigger" data-type="{{ m_type }}"
+      data-src="{{ url_for('media.serve_file', filename=m.filename) }}" onclick="openLightbox({{ loop.index0 }})">
 
-          {% if m_type == "image" %}
-          <img class="grid-media" src="{{ url_for('media.serve_file', filename=m.filename) }}" loading="lazy" alt="">
-          {% elif m_type == "video" %}
-          {% set thumb = m.thumbnail_path and url_for('media.serve_thumbnail', filename=m.thumbnail_path) or
-          url_for('media.serve_file',
-          filename=m.filename) %}
-          <img class="grid-media" src="{{ thumb }}" loading="lazy" alt="Video Thumbnail">
-          <div class="play-icon">▶</div>
-          <div class="video-badge">VIDEO</div>
-          {% endif %}
-        </div>
+      {% if m_type == "image" %}
+      <img class="grid-media" src="{{ url_for('media.serve_file', filename=m.filename) }}" loading="lazy" alt="">
+      {% elif m_type == "video" %}
+      {% set thumb = m.thumbnail_path and url_for('media.serve_thumbnail', filename=m.thumbnail_path) or
+      url_for('media.serve_file',
+      filename=m.filename) %}
+      <img class="grid-media" src="{{ thumb }}" loading="lazy" alt="Video Thumbnail">
+      <div class="play-icon">▶</div>
+      <div class="video-badge">VIDEO</div>
+      {% endif %}
+    </div>
 
-        <!-- Info -->
-        <div class="item-info">
-          <!-- Comment not yet carried over to new model? Added later -->
-          <div class="item-meta">
-            {{ (m.taken_at or m.created_at)|string }}
-          </div>
-        </div>
+    <!-- Info -->
+    <div class="item-info">
+      <!-- Comment not yet carried over to new model? Added later -->
+      <div class="item-meta">
+        {{ (m.taken_at or m.created_at)|string }}
       </div>
-      {% endfor %}
     </div>
-
-    <!-- Infinite Scroll Sentinel -->
-    <div id="scroll-sentinel" style="height: 50px; text-align: center; color: #999; margin-top: 20px;"></div>
-
   </div>
+  {% endfor %}
+</div>
 
-  <!-- Lightbox -->
-  <div id="lightbox" class="lightbox">
-    <button class="lightbox-close">&times;</button>
-    <button class="lightbox-nav lightbox-prev">&#10094;</button>
-    <div class="lightbox-content">
-      <img id="lightbox-img" class="lightbox-media" src="" alt="">
-      <video id="lightbox-video" class="lightbox-media" controls playsinline></video>
-    </div>
-    <button class="lightbox-nav lightbox-next">&#10095;</button>
-  </div>
+<!-- Infinite Scroll Sentinel -->
+<div id="scroll-sentinel" style="height: 50px; text-align: center; color: #999; margin-top: 20px;"></div>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
-</body>
-
-</html>
+{% endblock %}

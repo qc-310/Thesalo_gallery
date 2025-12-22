@@ -6,7 +6,7 @@ def create_app(config_name=None):
     if config_name is None:
         config_name = 'default'
         
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder='../templates', static_folder='../static')
     app.config.from_object(config[config_name])
     
     # Initialize Extensions
@@ -14,6 +14,11 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     oauth.init_app(app)
+    oauth.register(
+        name='google',
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={'scope': 'openid email profile'}
+    )
 
     # Import models to ensure they are discovered by Alembic
     from app import models
@@ -24,10 +29,13 @@ def create_app(config_name=None):
     from .blueprints.media import media_bp
     from .blueprints.core import core_bp
     
-    app.register_blueprint(auth_bp)
+    app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(family_bp, url_prefix='/family')
     app.register_blueprint(media_bp, url_prefix='/media')
     app.register_blueprint(core_bp)
+
+    # Configure Login Manager
+    login_manager.login_view = 'auth.login_page'
 
     # Celery Init
     from .celery_utils import celery_init_app

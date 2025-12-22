@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}My Families - Thesalo Gallery{% endblock %}
+{% block content %}
+<h1>My Families</h1>
+{% if families %}
+<ul>
+    {% for fam in families %}
+    <li>{{ fam.name }}</li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>You don't belong to any family yet.</p>
+{% endif %}
+<a href="{{ url_for('family.create_family') }}">Create New Family</a>
+{% endblock %}

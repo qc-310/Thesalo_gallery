@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Create Family - Thesalo Gallery{% endblock %}
+{% block content %}
+<h1>Create a New Family</h1>
+<form method="POST">
+    <label>Family Name:</label>
+    <input type="text" name="family_name" required>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}

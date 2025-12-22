@@ -38,7 +38,7 @@ def authorize():
         login_user(user)
         # Check if user has any family? If not redirect to family creation?
         # For now, redirect to index
-        return redirect(url_for('index'))
+        return redirect(url_for('core.index'))
     except Exception as e:
         flash(f'Login failed: {e}', 'error')
         return redirect(url_for('auth.login_page'))

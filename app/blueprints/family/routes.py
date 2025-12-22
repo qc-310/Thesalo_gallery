@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.services import FamilyService
 
-family_bp = Blueprint('family', __name__, template_folder='templates')
+family_bp = Blueprint('family', __name__)
 family_service = FamilyService()
 
 @family_bp.route('/create', methods=['GET', 'POST'])
@@ -13,7 +13,7 @@ def create_family():
         if name:
             family = family_service.create_family(name, current_user)
             flash(f'Family "{family.name}" created!', 'success')
-            return redirect(url_for('index')) # Redirect to dash/index
+            return redirect(url_for('core.index')) # Redirect to dash/index
     return render_template('create_family.html')
 
 @family_bp.route('/list')

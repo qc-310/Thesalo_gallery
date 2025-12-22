@@ -13,10 +13,14 @@ def app():
              "broker_url": "memory://",
              "result_backend": "cache+memory://",
              "task_always_eager": True # Run tasks synchronously for testing
-        }
+        },
+        "GOOGLE_CLIENT_ID": "dummy_client_id",
+        "GOOGLE_CLIENT_SECRET": "dummy_client_secret"
     })
 
     with app.app_context():
+        # Prevent DetachedInstanceError in tests
+        db.session.expire_on_commit = False
         db.create_all()
         yield app
         db.session.remove()

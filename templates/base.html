@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Thesalo Gallery{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                📷 Thesalo Gallery
+            </div>
+            <div>
+                {% if current_user.is_authenticated %}
+                <span style="font-size: 14px; margin-right: 10px; color: #666;">
+                    ログイン中: {{ current_user.name }} ({{ current_user.email }})
+                </span>
+                <a href="{{ url_for('auth.logout') }}"
+                    style="font-size: 14px; text-decoration: none; color: #666; background: #eee; padding: 6px 12px; border-radius: 20px;">ログアウト</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <!-- Lightbox (Common for now) -->
+    <div id="lightbox" class="lightbox">
+        <button class="lightbox-close">&times;</button>
+        <button class="lightbox-nav lightbox-prev">&#10094;</button>
+        <div class="lightbox-content">
+            <img id="lightbox-img" class="lightbox-media" src="" alt="">
+            <video id="lightbox-video" class="lightbox-media" controls playsinline></video>
+        </div>
+        <button class="lightbox-nav lightbox-next">&#10095;</button>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+</body>
+
+</html>
