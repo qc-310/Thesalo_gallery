@@ -22,10 +22,12 @@ def create_app(config_name=None):
     from .blueprints.auth import auth_bp
     from .blueprints.family import family_bp
     from .blueprints.media import media_bp
+    from .blueprints.core import core_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(family_bp, url_prefix='/family')
     app.register_blueprint(media_bp, url_prefix='/media')
+    app.register_blueprint(core_bp)
 
     # Celery Init
     from .celery_utils import celery_init_app

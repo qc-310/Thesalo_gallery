@@ -16,11 +16,11 @@
         📷 Thesalo Gallery
       </div>
       <div>
-        {% if user.is_authenticated %}
+        {% if current_user.is_authenticated %}
         <span style="font-size: 14px; margin-right: 10px; color: #666;">
-          ログイン中: {{ user.name }} ({{ user.email }})
+          ログイン中: {{ current_user.name }} ({{ current_user.email }})
         </span>
-        <a href="{{ url_for('logout') }}"
+        <a href="{{ url_for('auth.logout') }}"
           style="font-size: 14px; text-decoration: none; color: #666; background: #eee; padding: 6px 12px; border-radius: 20px;">ログアウト</a>
         {% endif %}
       </div>
@@ -30,12 +30,14 @@
   <div class="container">
 
     <!-- Upload Card -->
-    {% if user.is_admin %}
     <div class="upload-card">
       <div class="upload-title">
         <h3>新しい写真・動画を追加</h3>
       </div>
-      <form id="upload-form" class="upload-form" method="post" action="/upload" enctype="multipart/form-data">
+      <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
+        enctype="multipart/form-data">
+        <!-- Family Select Logic could go here if multiple families -->
+
         <label class="btn btn-secondary file-input-wrapper">
           <span>📁 ファイルを選択...</span>
           <input type="file" name="file" id="file-input" class="file-input" accept="image/*,video/*" multiple required
@@ -50,34 +52,34 @@
         <button id="upload-btn" class="btn btn-primary" type="submit">アップロード</button>
       </form>
     </div>
-    {% endif %}
 
     <!-- Masonry Grid -->
     <div class="masonry-grid">
-      {% for p in photos %}
-      <div class="grid-item fade-in" style="animation-delay: {{ loop.index0 * 0.05 }}s" data-id="{{ p.id }}">
+      {% for m in media_list %}
+      <div class="grid-item fade-in" style="animation-delay: {{ loop.index0 * 0.05 }}s" data-id="{{ m.id }}">
 
         <!-- Menu -->
-        {% if user.is_admin %}
+        <!-- Logic for edit/delete pending implementation in media_bp -->
+        <!-- 
         <button class="menu-btn" type="button">⋯</button>
         <div class="menu-dropdown">
-          <a href="{{ url_for('edit_photo', photo_id=p.id) }}" class="menu-item">✏️ 編集</a>
-          <form method="post" action="{{ url_for('delete_photo', photo_id=p.id) }}"
-            onsubmit="return confirm('本当に削除しますか？');">
-            <button type="submit" class="menu-item danger">🗑️ 削除</button>
-          </form>
+           ...
         </div>
-        {% endif %}
+        -->
 
         <!-- Media -->
-        <div class="media-wrapper media-trigger" data-type="{{ p.type }}"
-          data-src="{{ url_for('uploaded_file', filename=p.filename) }}" onclick="openLightbox({{ loop.index0 }})">
+        <!-- Determine type helper in template or model property -->
+        {% set m_type = 'video' if m.mime_type.startswith('video') else 'image' %}
 
-          {% if p.type == "image" %}
-          <img class="grid-media" src="{{ url_for('uploaded_file', filename=p.filename) }}" loading="lazy" alt="">
-          {% elif p.type == "video" %}
-          {% set thumb = p.thumbnail and url_for('thumbnail_file', filename=p.thumbnail) or url_for('uploaded_file',
-          filename=p.filename) %}
+        <div class="media-wrapper media-trigger" data-type="{{ m_type }}"
+          data-src="{{ url_for('media.serve_file', filename=m.filename) }}" onclick="openLightbox({{ loop.index0 }})">
+
+          {% if m_type == "image" %}
+          <img class="grid-media" src="{{ url_for('media.serve_file', filename=m.filename) }}" loading="lazy" alt="">
+          {% elif m_type == "video" %}
+          {% set thumb = m.thumbnail_path and url_for('media.serve_thumbnail', filename=m.thumbnail_path) or
+          url_for('media.serve_file',
+          filename=m.filename) %}
           <img class="grid-media" src="{{ thumb }}" loading="lazy" alt="Video Thumbnail">
           <div class="play-icon">▶</div>
           <div class="video-badge">VIDEO</div>
@@ -86,11 +88,9 @@
 
         <!-- Info -->
         <div class="item-info">
-          {% if p.comment %}
-          <div class="item-comment">{{ p.comment }}</div>
-          {% endif %}
+          <!-- Comment not yet carried over to new model? Added later -->
           <div class="item-meta">
-            {{ (p.captured_at or p.created_at).replace("T", " ")[:16] }}
+            {{ (m.taken_at or m.created_at)|string }}
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@
     <button class="lightbox-nav lightbox-next">&#10095;</button>
   </div>
 
-  <script src="{{ url_for('static', filename='app.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
 </body>
 
 </html>
