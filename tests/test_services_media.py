@@ -4,6 +4,7 @@ from app.services import MediaService, FamilyService, AuthService
 from app.models.media import Media
 from unittest.mock import MagicMock
 import io
+import uuid6
 
 def test_media_service_upload(app, mocker):
     with app.app_context():
@@ -47,6 +48,7 @@ def test_media_service_upload(app, mocker):
         mocker.patch('magic.from_file', return_value='image/jpeg')
         
         # Action
+        
         media = media_svc.upload_media(file, family.id, user)
         
         # Assertions
@@ -57,3 +59,43 @@ def test_media_service_upload(app, mocker):
         
         # Task triggered?
         mock_task.assert_called_once()
+
+def test_media_service_upload_invalid_extension(app):
+    """UT-MEDIA-002: Invalid Extension"""
+    with app.app_context():
+        media_svc = MediaService()
+        file = MagicMock()
+        file.filename = 'test.txt' # Invalid
+        
+        with pytest.raises(ValueError, match="Invalid file or extension"):
+            media_svc.upload_media(file, uuid6.uuid7(), MagicMock())
+
+def test_media_service_upload_duplicate(app, mocker):
+    """UT-MEDIA-003: Duplicate Filename"""
+    with app.app_context():
+        # Setup
+        auth = AuthService()
+        family_svc = FamilyService()
+        media_svc = MediaService()
+        
+        user = auth.login_or_register_google_user({'email': 'u@ex.com', 'sub': '000', 'name': 'U', 'picture': ''})
+        family = family_svc.create_family("Fam", user)
+        
+        # Mocks
+        mocker.patch('app.tasks.media_tasks.process_media_task.delay')
+        mocker.patch('pathlib.Path.mkdir')
+        # Simulate existence: True first (collision), then False (success)
+        mocker.patch('pathlib.Path.exists', side_effect=[True, False]) 
+        mocker.patch('pathlib.Path.stat', return_value=MagicMock(st_size=123))
+        mocker.patch('magic.from_file', return_value='image/jpeg')
+        
+        file = MagicMock()
+        file.filename = 'duplicate.jpg'
+        
+        # Action
+        media = media_svc.upload_media(file, family.id, user)
+        
+        # Assertions
+        assert media.filename != 'duplicate.jpg'
+        assert 'duplicate_' in media.filename
+        assert media.original_filename == 'duplicate.jpg'
