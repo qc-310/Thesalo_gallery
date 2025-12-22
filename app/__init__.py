@@ -18,9 +18,12 @@ def create_app(config_name=None):
     # Import models to ensure they are discovered by Alembic
     from app import models
 
-    # Register Blueprints (Placeholder)
-    # from .blueprints import auth_bp
-    # app.register_blueprint(auth_bp)
+    # Register Blueprints
+    from .blueprints.auth import auth_bp
+    from .blueprints.family import family_bp
+    
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(family_bp, url_prefix='/family')
 
     return app
 
