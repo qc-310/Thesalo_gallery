@@ -21,9 +21,22 @@ def create_app(config_name=None):
     # Register Blueprints
     from .blueprints.auth import auth_bp
     from .blueprints.family import family_bp
+    from .blueprints.media import media_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(family_bp, url_prefix='/family')
+    app.register_blueprint(media_bp, url_prefix='/media')
+
+    # Celery Init
+    from .celery_utils import celery_init_app
+    app.config.from_mapping(
+        CELERY=dict(
+            broker_url=app.config['CELERY_BROKER_URL'],
+            result_backend=app.config['CELERY_RESULT_BACKEND'],
+            task_ignore_result=True,
+        ),
+    )
+    celery_init_app(app)
 
     return app
 
