@@ -1,15 +1,30 @@
 {% extends "base.html" %}
-{% block title %}My Families - Thesalo Gallery{% endblock %}
+{% block title %}参加中の家族 - Thesalo Gallery{% endblock %}
 {% block content %}
-<h1>My Families</h1>
-{% if families %}
-<ul>
-    {% for fam in families %}
-    <li>{{ fam.name }}</li>
-    {% endfor %}
-</ul>
-{% else %}
-<p>You don't belong to any family yet.</p>
-{% endif %}
-<a href="{{ url_for('family.create_family') }}">Create New Family</a>
+<div style="max-width: 800px; margin: 0 auto;">
+    <h1 style="margin-bottom: 24px; font-size: 24px;">参加中の家族</h1>
+    {% if families %}
+    <div class="masonry-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));">
+        {% for fam in families %}
+        <div class="grid-item" style="padding: 20px; height: auto;">
+            <h3 style="margin-bottom: 10px;">{{ fam.name }}</h3>
+            <p style="color: #666; font-size: 14px;">メンバー数: {{ fam.members|length }}</p>
+            <a href="{{ url_for('core.index') }}" class="btn btn-secondary"
+                style="margin-top: 10px; width: 100%; text-align: center;">開く</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="upload-card" style="text-align: center; padding: 40px;">
+        <p style="margin-bottom: 20px; color: #666;">まだどの家族にも所属していません。</p>
+        <a href="{{ url_for('family.create_family') }}" class="btn btn-primary">新しい家族を作成</a>
+    </div>
+    {% endif %}
+
+    {% if families %}
+    <div style="margin-top: 40px; text-align: center;">
+        <a href="{{ url_for('family.create_family') }}" class="btn btn-secondary">＋ 新しい家族を作成</a>
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

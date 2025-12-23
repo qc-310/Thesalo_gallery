@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}ペット紹介 - Thesalo Gallery{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+        <h2>🐾 ペット紹介</h2>
+        <button onclick="openAddPetModal()" class="btn btn-primary">
+            + 追加
+        </button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 40px; max-width: 900px; margin: 0 auto;">
+        {% for pet in pets %}
+        <div class="pet-hero-card"
+            style="display: flex; flex-direction: column; @media(min-width: 768px){flex-direction: row;} gap: 40px; align-items: center; padding: 40px; background: var(--bg-primary); border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
+
+            <div style="flex-shrink: 0;">
+                <!-- Avatar Container -->
+                <div
+                    style="width: 280px; height: 280px; border-radius: 50%; overflow: hidden; background: var(--bg-tertiary); border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative;">
+                    {% if pet.avatar_url %}
+                    <!-- Background Image Avatar (Prevents distortion) -->
+                    <div role="img" aria-label="{{ pet.name }}"
+                        style="width: 100%; height: 100%; background-image: url('{{ url_for('media.serve_file', filename=pet.avatar_url) }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+                    </div>
+                    {% else %}
+                    <!-- Emoji Fallback -->
+                    <div
+                        style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 80px;">
+                        {% if pet.type == 'dog' %}🐶{% elif pet.type == 'cat' %}🐱{% else %}🐾{% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Content -->
+            <div style="flex-grow: 1; text-align: center; @media(min-width: 768px){text-align: left;}">
+                <!-- Title -->
+                <h2
+                    style="font-size: 48px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; letter-spacing: -0.02em;">
+                    {{ pet.name }}
+                </h2>
+
+                <!-- Subtitle (Breed / Type) -->
+                <div style="font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 24px;">
+                    {{ pet.breed or '品種不明' }} <span style="font-weight: 400; opacity: 0.8;">|</span>
+                    {% if pet.gender == 'male' %}男の子 (♂){% elif pet.gender == 'female' %}女の子 (♀){% else %}性別不明{% endif
+                    %}
+                </div>
+
+                <!-- Description / Bio Body -->
+                <div
+                    style="font-size: 15px; line-height: 1.8; color: var(--text-secondary); margin-bottom: 32px; max-width: 500px;">
+                    <p style="margin-bottom: 8px;">
+                        {% if pet.birth_date %}🎂 誕生日: {{ pet.birth_date }} <br>{% endif %}
+                        {% if pet.adoption_date %}🏠 記念日: {{ pet.adoption_date }}{% endif %}
+                    </p>
+                    <p style="opacity: 0.8; font-size: 13px; white-space: pre-wrap;">{{ pet.description or
+                        '自己紹介はまだありません。編集ボンから追加してください。' }}</p>
+                </div>
+
+                <!-- Circular Action Buttons -->
+                <div
+                    style="display: flex; gap: 20px; justify-content: center; @media(min-width: 768px){justify-content: flex-start;}">
+
+                    <!-- Edit (Yellow/Orange) -->
+                    <button
+                        onclick="openEditPetModal('{{ pet.id }}', '{{ pet.name }}', '{{ pet.type }}', '{{ pet.breed or '' }}', '{{ pet.gender or '' }}', '{{ pet.birth_date or '' }}', '{{ pet.adoption_date or '' }}', `{{ pet.description or '' }}`, '{{ url_for('media.serve_file', filename=pet.avatar_url) if pet.avatar_url else '' }}')"
+                        style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #f59e0b; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3); transition: transform 0.2s;">
+                        <span style="font-size: 20px; margin-bottom: 2px;">✏️</span>
+                        編集
+                    </button>
+
+                    <!-- Photos (Red) - Future Feature -->
+                    <div style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #ef4444; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); opacity: 0.8; cursor: not-allowed;"
+                        title="準備中">
+                        <span style="font-size: 20px; margin-bottom: 2px;">📷</span>
+                        写真
+                    </div>
+
+                    <!-- Details/Memory (Teal) - Known from example -->
+                    <div style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #2dd4bf; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(45, 212, 191, 0.3); opacity: 0.8; cursor: not-allowed;"
+                        title="準備中">
+                        <span style="font-size: 20px; margin-bottom: 2px;">💭</span>
+                        思い出
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-secondary);">
+            ペットが登録されていません。<br>右上のボタンから追加してください。
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Add Pet Modal -->
+<div id="add-pet-modal" class="lightbox" style="z-index: 2000;">
+    <div class="edit-modal-content" style="max-width: 500px;">
+        <button class="lightbox-close"
+            style="top: 10px; right: 10px; width: 32px; height: 32px; font-size: 20px; color: var(--text-secondary); background: transparent;"
+            onclick="closeAddPetModal()">×</button>
+
+        <h3 id="pet-modal-title" style="margin-bottom: 20px; color: var(--text-primary);">ペットを追加</h3>
+
+        <form id="add-pet-form" method="POST" action="{{ url_for('pets.add_pet') }}" enctype="multipart/form-data">
+            <div style="margin-bottom: 20px; text-align: center;">
+                <label for="pet-avatar" style="cursor: pointer; display: inline-block; position: relative;">
+                    <div id="avatar-preview"
+                        style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-tertiary); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 2px dashed var(--border-color);">
+                        <span style="font-size: 40px; color: var(--text-secondary);">📷</span>
+                    </div>
+                    <div style="margin-top: 8px; font-size: 12px; color: var(--color-primary);">アイコンを変更</div>
+                    <input type="file" id="pet-avatar" name="avatar" accept="image/*" style="display: none;"
+                        onchange="previewAvatar(this)">
+                </label>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">名前
+                    <span style="color:red">*</span></label>
+                <input type="text" id="pet-name" name="name" required
+                    style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                <div>
+                    <label
+                        style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">種類</label>
+                    <select id="pet-type" name="type"
+                        style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                        <option value="dog">犬</option>
+                        <option value="cat">猫</option>
+                        <option value="other">その他</option>
+                    </select>
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">性別</label>
+                    <select id="pet-gender" name="gender"
+                        style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                        <option value="male">男の子 (♂)</option>
+                        <option value="female">女の子 (♀)</option>
+                        <option value="unknown">不明</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">品種
+                    (犬種/猫種)</label>
+                <input type="text" id="pet-breed" name="breed" placeholder="例: トイプードル"
+                    style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">自己紹介
+                    / メモ</label>
+                <textarea id="pet-description" name="description" rows="3" placeholder="性格や特徴などを自由に入力してください"
+                    style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px; resize: none !important;"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div>
+                    <label
+                        style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">誕生日</label>
+                    <input type="date" id="pet-birth-date" name="birth_date"
+                        style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+                <div>
+                    <label
+                        style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">うちの子記念日</label>
+                    <input type="date" id="pet-adoption-date" name="adoption_date"
+                        style="width: 100%; padding: 8px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 4px;">
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                <button type="button" class="btn btn-secondary" onclick="closeAddPetModal()">キャンセル</button>
+                <button type="submit" id="pet-submit-btn" class="btn btn-primary">登録する</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openAddPetModal() {
+        const modal = document.getElementById('add-pet-modal');
+        const form = document.getElementById('add-pet-form');
+        const preview = document.getElementById('avatar-preview');
+
+        document.getElementById('pet-modal-title').textContent = 'ペットを追加';
+        document.getElementById('pet-submit-btn').textContent = '登録する';
+        form.reset();
+
+        // Reset preview
+        preview.innerHTML = '<span style="font-size: 40px; color: var(--text-secondary);">📷</span>';
+        preview.style.border = '2px dashed var(--border-color)';
+
+        form.action = "{{ url_for('pets.add_pet') }}";
+
+        modal.classList.add('active');
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+    }
+
+    function openEditPetModal(petId, name, type, breed, gender, birth, adoption, description, avatarUrl) {
+        const modal = document.getElementById('add-pet-modal');
+        const form = document.getElementById('add-pet-form');
+        const preview = document.getElementById('avatar-preview');
+
+        document.getElementById('pet-modal-title').textContent = 'ペット情報';
+        document.getElementById('pet-submit-btn').textContent = '更新する';
+
+        document.getElementById('pet-name').value = name;
+        document.getElementById('pet-type').value = type || 'other';
+        document.getElementById('pet-breed').value = breed;
+        document.getElementById('pet-gender').value = gender || 'unknown';
+        document.getElementById('pet-birth-date').value = birth;
+        document.getElementById('pet-adoption-date').value = adoption;
+        document.getElementById('pet-description').value = description || '';
+
+        // Set preview
+        if (avatarUrl && avatarUrl !== 'None' && avatarUrl !== '') {
+            preview.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            preview.style.border = '2px solid var(--border-color)';
+        } else {
+            preview.innerHTML = '<span style="font-size: 40px; color: var(--text-secondary);">📷</span>';
+            preview.style.border = '2px dashed var(--border-color)';
+        }
+
+        form.action = `/pets/${petId}/update`;
+
+        modal.classList.add('active');
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+    }
+
+    function closeAddPetModal() {
+        const modal = document.getElementById('add-pet-modal');
+        modal.classList.remove('active');
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
+    }
+    function previewAvatar(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                // Open crop modal logic
+                const cropImage = document.getElementById('crop-image');
+                const cropModal = document.getElementById('crop-modal');
+
+                cropImage.src = e.target.result;
+                cropModal.style.display = 'flex';
+
+                if (cropper) cropper.destroy();
+
+                cropper = new Cropper(cropImage, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    dragMode: 'move',
+                    autoCropArea: 1,
+                });
+            }
+            reader.readAsDataURL(file);
+            // Reset input value to allow re-selection of same file if cancelled
+            input.value = '';
+        }
+    }
+</script>
+
+<!-- Cropper Modal & Logic -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<style>
+    /* Crop Modal Styles */
+    .crop-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 3000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .crop-modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 500px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .crop-container {
+        width: 100%;
+        height: 400px;
+        background: #333;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .crop-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+</style>
+
+<div id="crop-modal" class="crop-overlay">
+    <div class="crop-modal-content">
+        <h3 style="color: #333;">画像を切り抜く</h3>
+        <div class="crop-container">
+            <img id="crop-image" style="max-width: 100%;">
+        </div>
+        <div class="crop-actions">
+            <button type="button" class="btn btn-secondary" onclick="cancelCrop()">キャンセル</button>
+            <button type="button" class="btn btn-primary" onclick="applyCrop()">適用する</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script>
+    let cropper = null;
+    let originalFileInput = document.getElementById('pet-avatar');
+
+    function cancelCrop() {
+        document.getElementById('crop-modal').style.display = 'none';
+        if (cropper) cropper.destroy();
+        cropper = null;
+    }
+
+    function applyCrop() {
+        if (!cropper) return;
+
+        cropper.getCroppedCanvas({
+            width: 400, height: 400
+        }).toBlob((blob) => {
+            // Create new File
+            const newFile = new File([blob], "avatar_cropped.png", { type: "image/png" });
+
+            // Update Input
+            const dt = new DataTransfer();
+            dt.items.add(newFile);
+
+            // Re-select input (safeguard)
+            const input = document.getElementById('pet-avatar');
+            input.files = dt.files;
+
+            // Update Preview
+            const preview = document.getElementById('avatar-preview');
+            const url = URL.createObjectURL(blob);
+            preview.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+            preview.style.border = '2px solid var(--border-color)';
+
+            cancelCrop();
+        }, 'image/png');
+    }
+</script>
+
+<style>
+    /* Fix for select options in dark modal */
+    #add-pet-modal select option {
+        color: #333;
+        background-color: #fff;
+    }
+</style>
+{% endblock %}

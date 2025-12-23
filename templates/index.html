@@ -2,28 +2,107 @@
 
 {% block content %}
 
-<!-- Upload Card -->
-<div class="upload-card">
-  <div class="upload-title">
-    <h3>新しい写真・動画を追加</h3>
+<!-- Floating Upload Button -->
+<a href="{{ url_for('media.upload_page') }}" class="fab-btn" title="アップロード">
+  +
+</a>
+
+<!-- Edit Media Modal -->
+<div id="edit-modal" class="lightbox" style="z-index: 1001;">
+  <div class="edit-modal-content">
+    <button class="lightbox-close"
+      style="top: 10px; right: 10px; width: 32px; height: 32px; font-size: 20px; color: var(--text-secondary); background: transparent;"
+      onclick="closeEditModal()">×</button>
+    <!-- Preview Image (Absolute Positioned) -->
+    <img id="edit-preview-image" class="edit-preview-img" src="" alt=""
+      style="display: none; position: absolute; top: 24px; right: 60px; width: 120px; height: 120px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);"
+      onerror="this.style.display='none'" onload="this.style.display='block'">
+
+    <h3 style="margin-bottom: 20px; color: var(--text-primary); max-width: calc(100% - 140px);">詳細を編集</h3>
+
+    <form id="edit-media-form" onsubmit="submitEdit(event)">
+      <input type="hidden" id="edit-media-id">
+
+      <div style="margin-bottom: 16px; max-width: calc(100% - 140px);">
+        <label style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">撮影日時</label>
+        <!-- Using type="datetime-local" for easy picking, though taken_at is stored as ISO string -->
+        <input type="datetime-local" id="edit-taken-at" name="taken_at"
+          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; width: 220px !important;">
+      </div>
+
+      <div>
+        <label style="display: block; font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">コメント</label>
+        <textarea id="edit-description" name="description" rows="4" placeholder="思い出の一言..."
+          style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; width: 100%;"></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <button type="button" class="btn btn-danger" onclick="deleteMedia()"
+          style="background-color: var(--color-danger); color: white; border: none;">削除</button>
+        <div style="display: flex; gap: 12px;">
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存する</button>
+        </div>
+      </div>
+    </form>
   </div>
-  <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
-    enctype="multipart/form-data">
-    <!-- Family Select Logic could go here if multiple families -->
+</div>
 
-    <label class="btn btn-secondary file-input-wrapper">
-      <span>📁 ファイルを選択...</span>
-      <input type="file" name="file" id="file-input" class="file-input" accept="image/*,video/*" multiple required
-        style="position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;">
-    </label>
+<!-- Filter/Sort Bar -->
+<div
+  style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
 
-    <!-- File Preview Container -->
-    <div id="file-preview-container"
-      style="display:none; margin-top: 10px; text-align: center; background: #f0f0f0; padding: 10px; border-radius: 8px; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px;">
-    </div>
+  <!-- Filter Pills (Left) -->
+  <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; align-items: center;">
+    {% set current_sort = request.args.get('sort', 'created_at_desc') %}
+    {% set current_type = request.args.get('type', 'all') %}
 
-    <button id="upload-btn" class="btn btn-primary" type="submit">アップロード</button>
-  </form>
+    <a href="{{ url_for('core.index', type='all', sort=current_sort) }}"
+      class="btn {{ 'btn-primary' if current_type == 'all' else 'btn-secondary' }}"
+      style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+      すべて
+    </a>
+    <a href="{{ url_for('core.index', type='favorites', sort=current_sort) }}"
+      class="btn {{ 'btn-primary' if current_type == 'favorites' else 'btn-secondary' }}"
+      style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+      ♥ お気に入り
+    </a>
+    <a href="{{ url_for('core.index', type='image', sort=current_sort) }}"
+      class="btn {{ 'btn-primary' if current_type == 'image' else 'btn-secondary' }}"
+      style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+      写真のみ
+    </a>
+    <a href="{{ url_for('core.index', type='video', sort=current_sort) }}"
+      class="btn {{ 'btn-primary' if current_type == 'video' else 'btn-secondary' }}"
+      style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+      動画のみ
+    </a>
+    <a href="{{ url_for('core.index', type='mine', sort=current_sort) }}"
+      class="btn {{ 'btn-primary' if current_type == 'mine' else 'btn-secondary' }}"
+      style="padding: 6px 16px; font-size: 13px; border-radius: 20px; white-space: nowrap;">
+      自分の投稿
+    </a>
+  </div>
+
+  <!-- Sort Control (Right) -->
+  <div style="display: flex; align-items: center;">
+    <form action="{{ url_for('core.index') }}" method="get"
+      style="display: flex; align-items: center; gap: 8px; margin: 0;">
+      <input type="hidden" name="type" value="{{ request.args.get('type', 'all') }}">
+      <label style="font-size: 12px; color: var(--text-secondary); font-weight: 600; white-space: nowrap;">並び替え:</label>
+      <select name="sort" onchange="this.form.submit()" class="nav-select"
+        style="padding: 6px 12px; border-radius: 8px; font-size: 13px; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary);">
+        <option value="created_at_desc" {% if request.args.get('sort')=='created_at_desc' or not
+          request.args.get('sort') %}selected{% endif %}>追加日 (新しい順)</option>
+        <option value="created_at_asc" {% if request.args.get('sort')=='created_at_asc' %}selected{% endif %}>追加日 (古い順)
+        </option>
+        <option value="taken_at_desc" {% if request.args.get('sort')=='taken_at_desc' %}selected{% endif %}>撮影日 (新しい順)
+        </option>
+        <option value="taken_at_asc" {% if request.args.get('sort')=='taken_at_asc' %}selected{% endif %}>撮影日 (古い順)
+        </option>
+      </select>
+    </form>
+  </div>
 </div>
 
 <!-- Masonry Grid -->
@@ -45,7 +124,23 @@
     {% set m_type = 'video' if m.mime_type.startswith('video') else 'image' %}
 
     <div class="media-wrapper media-trigger" data-type="{{ m_type }}"
-      data-src="{{ url_for('media.serve_file', filename=m.filename) }}" onclick="openLightbox({{ loop.index0 }})">
+      data-src="{{ url_for('media.serve_file', filename=m.filename) }}" data-description="{{ m.description or '' }}"
+      data-uploader="{{ m.uploader.display_name or m.uploader.name or 'Unknown' }}"
+      data-date="{{ m.created_at|friendly_date }}" onclick="openLightbox({{ loop.index0 }})">
+
+      <!-- Taken Date Badge (Memory Date) -->
+      {% if m.taken_at %}
+      <div class="memory-date-badge">
+        📅 {{ m.taken_at|friendly_date }}
+      </div>
+      {% endif %}
+
+      <!-- Favorite Button -->
+      <!-- Check if current user favorited this media -->
+      {% set is_fav = current_user in m.favorited_by %}
+      <button class="favorite-btn {{ 'active' if is_fav else '' }}" onclick="toggleFavorite('{{ m.id }}', event)">
+        {{ '♥' if is_fav else '♡' }}
+      </button>
 
       {% if m_type == "image" %}
       <img class="grid-media" src="{{ url_for('media.serve_file', filename=m.filename) }}" loading="lazy" alt="">
@@ -60,10 +155,43 @@
     </div>
 
     <!-- Info -->
-    <div class="item-info">
-      <!-- Comment not yet carried over to new model? Added later -->
-      <div class="item-meta">
-        {{ (m.taken_at or m.created_at)|string }}
+    <div class="item-info" style="position: relative;">
+      <div style="display: flex; gap: 10px; align-items: center;">
+
+        <!-- Avatar -->
+        <div class="uploader-avatar"
+          style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: #eee;">
+          {% if m.uploader and m.uploader.avatar_url %}
+          <img src="{{ url_for('media.serve_file', filename=m.uploader.avatar_url) }}" alt="{{ m.uploader.name }}"
+            style="width: 100%; height: 100%; object-fit: cover;">
+          {% else %}
+          <div
+            style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px;">
+            👤</div>
+          {% endif %}
+        </div>
+
+        <!-- Text Content -->
+        <div style="flex: 1; min-width: 0;">
+          <!-- Header: Name & Date -->
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3;">
+              <span
+                style="font-weight: 600; font-size: 12px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;">
+                {{ m.uploader.display_name or m.uploader.name or 'Unknown' }}
+              </span>
+              <span style="font-size: 10px; color: var(--text-secondary); white-space: nowrap;">
+                {{ m.created_at|friendly_date }}
+              </span>
+            </div>
+
+            <!-- Edit Button (Small icon) -->
+            <button class="edit-btn" title="編集" onclick="openEditModal('{{ m.id }}', event)"
+              style="background: none; border: none; cursor: pointer; padding: 0; font-size: 14px; opacity: 0.6; transition: opacity 0.2s;">
+              ✏️
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -74,3 +202,146 @@
 <div id="scroll-sentinel" style="height: 50px; text-align: center; color: #999; margin-top: 20px;"></div>
 
 {% endblock %}
+
+{% block scripts %}
+<script>
+  // Reuse inherited scripts block if defined in base, otherwise standard script tag
+  // Assuming base.html includes app.js at bottom, but we can add inline here for now
+
+  function openEditModal(mediaId, event) {
+    // Prevent lightbox opening if clicked (event bubbling)
+    if (event) event.stopPropagation();
+
+    fetch(`/media/${mediaId}/details`)
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('edit-media-id').value = data.id;
+        document.getElementById('edit-description').value = data.description || '';
+
+        // Set preview image logic
+        const imgEl = document.getElementById('edit-preview-image');
+        imgEl.style.display = 'none'; // Reset to hidden
+        imgEl.src = '';
+
+        if (data.mime_type && data.mime_type.startsWith('video')) {
+          if (data.thumbnail_path) {
+            imgEl.src = `/media/thumb/${data.thumbnail_path}`;
+            // onload will handle display
+          }
+        } else if (data.filename) {
+          imgEl.src = `/media/file/${data.filename}`;
+          // onload will handle display
+        }
+
+        // Handle datetime formatting for input
+        // data.taken_at might be ISO string "2023-12-23T15:00:00" or similar
+        if (data.taken_at) {
+          // Remove seconds/timezone if needed for datetime-local which expects "YYYY-MM-DDThh:mm"
+          let val = data.taken_at;
+          if (val.length > 16) val = val.substring(0, 16);
+          document.getElementById('edit-taken-at').value = val;
+        } else {
+          document.getElementById('edit-taken-at').value = '';
+        }
+
+        const modal = document.getElementById('edit-modal');
+        modal.classList.add('active'); // Reuse lightbox active class for visibility
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+      });
+  }
+
+  function closeEditModal() {
+    const modal = document.getElementById('edit-modal');
+    modal.classList.remove('active');
+    modal.style.opacity = '0';
+    modal.style.visibility = 'hidden';
+  }
+
+  function submitEdit(e) {
+    e.preventDefault();
+    const id = document.getElementById('edit-media-id').value;
+    const desc = document.getElementById('edit-description').value;
+    const date = document.getElementById('edit-taken-at').value;
+
+    const formData = new FormData();
+    formData.append('description', desc);
+    formData.append('taken_at', date);
+
+    fetch(`/media/${id}/update`, {
+      method: 'POST',
+      body: formData
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showMessageModal('更新完了', '詳細を保存しました', () => location.reload());
+        } else {
+          showErrorModal('更新失敗: ' + data.error);
+        }
+      });
+  }
+
+  function deleteMedia() {
+    showConfirmModal('本当にこの写真/動画を削除しますか？', function () {
+      performDelete();
+    });
+  }
+
+  function performDelete() {
+    const id = document.getElementById('edit-media-id').value;
+
+    // Close confirm modal first (optional)
+    closeConfirmModal();
+
+    fetch(`/media/${id}/delete`, {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          showMessageModal('削除しました', 'ファイルは完全に削除されました。', () => location.reload());
+        } else {
+          showErrorModal('削除失敗: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        showErrorModal('エラーが発生しました');
+      });
+  }
+
+  // Global modal logic moved to app.js
+
+  function toggleFavorite(mediaId, event) {
+    if (event) event.stopPropagation();
+
+    const btn = event.currentTarget;
+
+    // Optimistic UI update
+    const wasActive = btn.classList.contains('active');
+    btn.classList.toggle('active');
+    btn.textContent = wasActive ? '♡' : '♥';
+
+    fetch(`/media/${mediaId}/favorite`, {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          // Revert on error
+          btn.classList.toggle('active');
+          btn.textContent = wasActive ? '♥' : '♡';
+          console.error(data.error);
+        }
+        // Success, nothing else to do
+      })
+      .catch(err => {
+        btn.classList.toggle('active');
+        btn.textContent = wasActive ? '♥' : '♡';
+        console.error(err);
+      });
+  }
+</script>
+{% endblock %}
+```

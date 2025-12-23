@@ -26,7 +26,7 @@ def login():
 def logout():
     logout_user()
     session.clear()
-    return redirect(url_for('index')) # Index will likely redirect to login if not auth
+    return redirect(url_for('core.index')) # Index will likely redirect to login if not auth
 
 @auth_bp.route('/callback')
 def authorize():

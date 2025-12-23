@@ -25,14 +25,15 @@ def create_app(config_name=None):
 
     # Register Blueprints
     from .blueprints.auth import auth_bp
-    from .blueprints.family import family_bp
     from .blueprints.media import media_bp
     from .blueprints.core import core_bp
+    from .blueprints.pets import pets_bp
     
     app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(family_bp, url_prefix='/family')
+    # Family blueprint removed
     app.register_blueprint(media_bp, url_prefix='/media')
     app.register_blueprint(core_bp)
+    app.register_blueprint(pets_bp, url_prefix='/pets')
 
     # Configure Login Manager
     login_manager.login_view = 'auth.login_page'
@@ -47,6 +48,14 @@ def create_app(config_name=None):
         ),
     )
     celery_init_app(app)
+
+    @app.errorhandler(404)
+    def page_not_found(e):
+        from flask import render_template
+        return render_template('404.html'), 404
+
+    from app.utils.filters import friendly_date
+    app.jinja_env.filters['friendly_date'] = friendly_date
 
     return app
 

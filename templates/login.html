@@ -77,11 +77,12 @@
 <body>
 
     <div class="login-card">
-        <span class="logo">📷</span>
+        <img src="{{ url_for('static', filename='images/app_icon.jpg') }}" alt="Logo" class="logo"
+            style="width: 80px; height: 80px; border-radius: 20px; object-fit: cover; margin: 0 auto 20px auto;">
         <h1>Thesalo Gallery</h1>
-        <p>写真や動画をアップロードするにはログインしてください</p>
+        <p>わんちゃん・ねこちゃんとの<br>大切な思い出をシェアしよう🐾</p>
 
-        <a href="{{ url_for('login') }}" class="google-btn">
+        <a href="{{ url_for('auth.login') }}" class="google-btn">
             <!-- SVG Google Icon -->
             <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20px" height="20px">
                 <path fill="#FFC107"

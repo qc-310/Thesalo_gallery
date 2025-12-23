@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}プロフィール - Thesalo Gallery{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 0 auto;">
+    <div class="upload-card" style="text-align: left;">
+        <h2 style="margin-bottom: 24px;">プロフィール編集</h2>
+
+        <form method="POST" action="{{ url_for('core.profile') }}" enctype="multipart/form-data">
+
+            <!-- Avatar Section -->
+            <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 24px;">
+                <div
+                    style="width: 100px; height: 100px; border-radius: 50%; overflow: hidden; background: var(--bg-tertiary); margin-bottom: 12px; border: 2px solid var(--border-color);">
+                    {% if user.avatar_url %}
+                    <img src="{{ url_for('media.serve_file', filename=user.avatar_url) }}"
+                        style="width: 100%; height: 100%; object-fit: cover;">
+                    {% else %}
+                    <div
+                        style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 40px;">
+                        👤</div>
+                    {% endif %}
+                </div>
+                <label class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;">
+                    画像を変更
+                    <input type="file" name="avatar" accept="image/*" style="display: none;"
+                        onchange="previewAvatar(this)">
+                </label>
+            </div>
+
+            <!-- Basic Info -->
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">表示名 (ニックネーム)</label>
+                <input type="text" name="display_name" value="{{ user.display_name or user.name }}"
+                    placeholder="例: パパ, ママ, 〇〇ちゃん" required>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">自己紹介</label>
+                <textarea name="bio" rows="3" placeholder="ペットへの愛や、あなたの役割を書きましょう">{{ user.bio or '' }}</textarea>
+            </div>
+
+            <div style="margin-bottom: 24px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">メールアドレス (変更不可)</label>
+                <input type="text" value="{{ user.email }}" disabled
+                    style="background: var(--bg-tertiary); color: var(--text-secondary);">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">保存する</button>
+        </form>
+    </div>
+</div>
+
+<!-- Cropper Modal -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+<style>
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 2000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 500px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .crop-container {
+        width: 100%;
+        height: 400px;
+        background: #333;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .crop-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+</style>
+
+<div id="crop-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3>画像を切り抜く</h3>
+        <div class="crop-container">
+            <img id="crop-image" style="max-width: 100%;">
+        </div>
+        <div class="crop-actions">
+            <button type="button" class="btn btn-secondary" onclick="cancelCrop()">キャンセル</button>
+            <button type="button" class="btn btn-primary" onclick="applyCrop()">適用する</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script>
+    let cropper = null;
+    const fileInput = document.querySelector('input[name="avatar"]');
+    const modal = document.getElementById('crop-modal');
+    const cropImage = document.getElementById('crop-image');
+    const previewImage = document.getElementById('avatar-preview'); // Need to ensure ID matches or select correctly
+
+    // Add ID to preview container image if not present or select generically
+    function getPreviewImg() {
+        // Current structure: .upload-card > div > div > img
+        // We can just rely on the existing image tag or placeholder
+        const container = document.querySelector('.upload-card img');
+        if (container) return container;
+        // If placeholder div
+        return null;
+    }
+
+    function previewAvatar(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                // Open modal
+                cropImage.src = e.target.result;
+                modal.style.display = 'flex';
+
+                // Destroy previous if any
+                if (cropper) cropper.destroy();
+
+                // Init Cropper
+                cropper = new Cropper(cropImage, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    dragMode: 'move',
+                    autoCropArea: 1,
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+        // Clear input so same file can be selected again if cancelled (optional)
+        input.value = '';
+    }
+
+    // We need to hijack the input's onchange from the inline HTML
+    // The template has onchange="previewAvatar(this)" which is fine.
+
+    function cancelCrop() {
+        modal.style.display = 'none';
+        if (cropper) cropper.destroy();
+        cropper = null;
+    }
+
+    function applyCrop() {
+        if (!cropper) return;
+
+        cropper.getCroppedCanvas({
+            width: 400,
+            height: 400
+        }).toBlob((blob) => {
+            // Create new File from Blob
+            const newFile = new File([blob], "avatar_cropped.png", { type: "image/png" });
+
+            // Update File Input using DataTransfer
+            const dt = new DataTransfer();
+            dt.items.add(newFile);
+
+            // Re-select the input element as 'fileInput' might be stale or captured weirdly
+            const input = document.querySelector('input[name="avatar"]');
+            input.files = dt.files;
+
+            // Update Preview on page
+            const url = URL.createObjectURL(blob);
+            let img = getPreviewImg();
+            if (!img) {
+                // If placeholder was there, replace it
+                const placeholder = document.querySelector('.upload-card div div');
+                // This selector is a bit loose, relying on structure: div > div (circle) > (img or div placeholder)
+                if (placeholder) {
+                    placeholder.innerHTML = `<img src="${url}" style="width: 100%; height: 100%; object-fit: cover;">`;
+                }
+            } else {
+                img.src = url;
+            }
+
+            cancelCrop(); // Close modal
+        }, 'image/png');
+    }
+</script>
+{% endblock %}

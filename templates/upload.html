@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px; margin: 0 auto;">
+    <div class="upload-card">
+        <div class="upload-title">
+            <h3>新しい写真・動画を追加</h3>
+        </div>
+
+        <div id="upload-notification"
+            style="display:none; margin-bottom: 20px; padding: 15px; border-radius: 8px; text-align: center;"></div>
+
+        <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
+            enctype="multipart/form-data">
+            <!-- Family Select Logic could go here if multiple families -->
+
+            <label class="btn btn-secondary file-input-wrapper">
+                <span>📁 ファイルを選択...</span>
+                <input type="file" name="file" id="file-input" class="file-input" accept="image/*,video/*" multiple
+                    required style="position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;">
+            </label>
+
+            <!-- File Preview Container -->
+            <div id="file-preview-container" class="file-preview-container">
+            </div>
+
+            <div style="display: flex; gap: 12px; width: 100%; justify-content: center; margin-top: 20px;">
+                <a href="{{ url_for('core.index') }}" class="btn btn-secondary"
+                    style="flex: 1; text-align: center; text-decoration: none;">キャンセル</a>
+                <button id="upload-btn" class="btn btn-primary" type="submit" style="flex: 1;">アップロード</button>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+
+<!-- Success Modal -->
+<div id="success-modal" class="lightbox" style="z-index: 2000;">
+    <div class="edit-modal-content" style="text-align: center; padding: 40px; max-width: 400px;">
+        <div style="font-size: 48px; margin-bottom: 20px;">🎉</div>
+        <h3 style="margin-bottom: 16px; color: var(--text-primary);">アップロード完了</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 32px;">ファイルが正常に保存されました。</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <a href="{{ url_for('core.index') }}" class="btn btn-secondary">ホームへ</a>
+            <button onclick="closeSuccessModal()" class="btn btn-primary" style="min-width: 120px;">続けて追加</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Ensure app.js init functions run. Since they are DOMContentLoaded, they should catch this if app.js is included in base.
+</script>
+{% endblock %}
