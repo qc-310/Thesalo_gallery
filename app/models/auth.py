@@ -14,8 +14,17 @@ class User(BaseModel, UserMixin):
     avatar_url: Mapped[Optional[str]] = mapped_column(String(1024))
     display_name: Mapped[Optional[str]] = mapped_column(String(255))
     bio: Mapped[Optional[str]] = mapped_column(String(1024))
-    
+
     # Relationships
-    display_name: Mapped[Optional[str]] = mapped_column(String(255))
-    bio: Mapped[Optional[str]] = mapped_column(String(1024))
+
+    role: Mapped[str] = mapped_column(String(50), default='guest', nullable=False)
+
+    @property
+    def is_owner(self):
+        return self.role == 'owner'
+
+    @property
+    def is_family(self):
+        return self.role in ['owner', 'family']
+
 

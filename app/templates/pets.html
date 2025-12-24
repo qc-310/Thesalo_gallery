@@ -6,9 +6,11 @@
 <div class="container">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
         <h2>🐾 ペット紹介</h2>
+        {% if current_user.is_family %}
         <button onclick="openAddPetModal()" class="btn btn-primary">
             + 追加
         </button>
+        {% endif %}
     </div>
 
     <div style="display: flex; flex-direction: column; gap: 40px; max-width: 900px; margin: 0 auto;">
@@ -66,12 +68,14 @@
                     style="display: flex; gap: 20px; justify-content: center; @media(min-width: 768px){justify-content: flex-start;}">
 
                     <!-- Edit (Yellow/Orange) -->
+                    {% if current_user.is_family %}
                     <button
                         onclick="openEditPetModal('{{ pet.id }}', '{{ pet.name }}', '{{ pet.type }}', '{{ pet.breed or '' }}', '{{ pet.gender or '' }}', '{{ pet.birth_date or '' }}', '{{ pet.adoption_date or '' }}', `{{ pet.description or '' }}`, '{{ url_for('media.serve_file', filename=pet.avatar_url) if pet.avatar_url else '' }}')"
                         style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #f59e0b; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3); transition: transform 0.2s;">
                         <span style="font-size: 20px; margin-bottom: 2px;">✏️</span>
                         編集
                     </button>
+                    {% endif %}
 
                     <!-- Photos (Red) - Future Feature -->
                     <div style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #ef4444; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3); opacity: 0.8; cursor: not-allowed;"

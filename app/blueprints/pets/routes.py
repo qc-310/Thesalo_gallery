@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
+from app.utils.decorators import role_required
 from app.services import PetService
 
 pets_bp = Blueprint('pets', __name__)
@@ -13,6 +14,7 @@ def list_pets():
 
 @pets_bp.route('/add', methods=['POST'])
 @login_required
+@role_required('family')
 def add_pet():
     data = {
         'name': request.form.get('name'),
@@ -36,6 +38,7 @@ def add_pet():
 
 @pets_bp.route('/<string:pet_id>/update', methods=['POST'])
 @login_required
+@role_required('family')
 def update_pet(pet_id):
     data = {
         'name': request.form.get('name'),

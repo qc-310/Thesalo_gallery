@@ -36,19 +36,32 @@ class AuthService:
             # But we only support Google, so let's stick to google_id or email
             user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
 
+        # Determine Role
+        import os
+        owner_email = os.environ.get('OWNER_EMAIL')
+        
+        target_role = 'guest'
+        if owner_email and email == owner_email:
+            target_role = 'owner'
+
         if user:
             # Update info
             user.name = name
             user.avatar_url = picture
             if not user.google_id:
                 user.google_id = google_id
+            
+            # If user is owner email, enforce owner role (in case it was changed or new env var set)
+            if target_role == 'owner' and user.role != 'owner':
+                user.role = 'owner'
         else:
             # Create new user
             user = User(
                 email=email,
                 name=name,
                 google_id=google_id,
-                avatar_url=picture
+                avatar_url=picture,
+                role=target_role
             )
             db.session.add(user)
 

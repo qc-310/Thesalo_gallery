@@ -57,7 +57,9 @@
                 <li><a href="{{ url_for('core.index') }}" class="nav-link">ホーム</a></li>
                 <li><a href="{{ url_for('pets.list_pets') }}" class="nav-link">ペット紹介</a></li>
                 <li><a href="{{ url_for('core.profile') }}" class="nav-link">プロフィール</a></li>
+                {% if current_user.is_owner %}
                 <li><a href="{{ url_for('core.settings') }}" class="nav-link">設定</a></li>
+                {% endif %}
             </ul>
             <!-- Filters moved to index page -->
             <div style="flex-grow: 1;"></div>

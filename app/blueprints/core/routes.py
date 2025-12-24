@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
+from app.utils.decorators import role_required
 from flask_login import login_required, current_user
 from app.services import MediaService
 import uuid6
@@ -56,6 +57,7 @@ def profile():
 
 @core_bp.route('/settings')
 @login_required
+@role_required('owner')
 def settings():
     
     # Calculate Usage Stats (Media uploaded by current user)

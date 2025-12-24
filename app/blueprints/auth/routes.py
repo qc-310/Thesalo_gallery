@@ -1,8 +1,9 @@
-from flask import Blueprint, redirect, url_for, session, render_template, request, flash
-from flask_login import login_user, logout_user, login_required
+from flask import Blueprint, redirect, url_for, session, render_template, request, flash, abort
+from flask_login import login_user, logout_user, login_required, current_user
 from app.extensions import oauth, login_manager, db
 from app.services import AuthService
 from app.models.auth import User
+from app.utils.decorators import role_required
 import uuid6
 
 auth_bp = Blueprint('auth', __name__, template_folder='templates')
@@ -69,3 +70,39 @@ def dev_login():
     
     login_user(user)
     return redirect(url_for('core.index'))
+
+@auth_bp.route('/users')
+@login_required
+@role_required('owner')
+def list_users():
+    users = db.session.execute(db.select(User).order_by(User.role, User.email)).scalars().all()
+    return render_template('users.html', users=users)
+
+@auth_bp.route('/users/<uuid_id>/role', methods=['POST'])
+@login_required
+@role_required('owner')
+def update_role(uuid_id):
+    try:
+        user = db.session.get(User, uuid6.UUID(uuid_id))
+    except (ValueError, TypeError):
+        # Handle string UUID if necessary or rely on flask converter? 
+        # Using string argument but converting manually to be safe
+        user = db.session.get(User, uuid6.UUID(uuid_id))
+        
+    if not user:
+        flash('ユーザーが見つかりません', 'error')
+        return redirect(url_for('auth.list_users'))
+
+    if user.id == current_user.id:
+        flash('自分自身の権限は変更できません', 'error')
+        return redirect(url_for('auth.list_users'))
+        
+    new_role = request.form.get('role')
+    if new_role not in ['family', 'guest']:
+        flash('不正なロールです', 'error')
+        return redirect(url_for('auth.list_users'))
+    
+    user.role = new_role
+    db.session.commit()
+    flash(f'ユーザー {user.name} のロールを {new_role} に変更しました', 'success')
+    return redirect(url_for('auth.list_users'))

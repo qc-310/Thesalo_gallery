@@ -7,7 +7,15 @@
     <div class="upload-card" style="text-align: left;">
         <h2 style="margin-bottom: 24px;">設定</h2>
 
-        <!-- Family Management Removed -->
+        <!-- Admin Section -->
+        <div style="margin-bottom: 32px;">
+            <h4 style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">管理者メニュー
+            </h4>
+            <a href="{{ url_for('auth.list_users') }}" class="btn btn-primary"
+                style="width: 100%; text-align: center; text-decoration: none; display: block;">
+                👥 ユーザー管理
+            </a>
+        </div>
 
         <!-- App Usage -->
         <div style="margin-bottom: 32px;">

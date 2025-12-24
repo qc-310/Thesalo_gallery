@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, send_from_directory, current_app, abort, render_template
 from flask_login import login_required, current_user
 from app.services import MediaService
+from app.utils.decorators import role_required
 import uuid6
 
 media_bp = Blueprint('media', __name__)
@@ -8,11 +9,13 @@ media_service = MediaService()
 
 @media_bp.route('/add', methods=['GET'])
 @login_required
+@role_required('family')
 def upload_page():
     return render_template('upload.html')
 
 @media_bp.route('/upload', methods=['POST'])
 @login_required
+@role_required('family')
 def upload():
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
@@ -58,6 +61,7 @@ def serve_thumbnail(filename):
 
 @media_bp.route('/<string:media_id>/update', methods=['POST'])
 @login_required
+@role_required('family')
 def update_media(media_id):
     from app.services import MediaService
     from app.extensions import db
@@ -84,6 +88,7 @@ def update_media(media_id):
 
 @media_bp.route('/<string:media_id>/delete', methods=['POST'])
 @login_required
+@role_required('owner')
 def delete_media_item(media_id):
     media = media_service.get_media(media_id)
     if not media:

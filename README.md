@@ -1,21 +1,32 @@
-# Thesalo Gallery v1.1.1
+# Thesalo Gallery v2.0.0
 
 Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュアな写真・動画共有ギャラリーです。
-家族や友人との思い出共有を目的として設計されており、管理者は写真のアップロードや編集ができ、ゲストは閲覧のみが可能です。
+家族や友人との思い出共有を目的として設計されており、役割（Owner, Family, Guest）に応じた柔軟な権限管理が可能です。
 
 ## 主な機能
 
-* **Google認証**: セキュアなログイン機能。
+* **Google認証**: セキュアなログイン機能 (OpenID Connect)。
 * **権限管理 (RBAC)**:
-  * **管理者 (Admin)**: 写真のアップロード、編集、削除が可能。
-  * **ゲスト (Guest)**: 閲覧のみ可能（アップロード等は不可）。
-* **マルチアップロード**: 複数の写真・動画を一度にドラッグ＆ドロップでアップロード。
-* **個別コメント**: アップロード時に、写真一枚一枚に対してコメント入力が可能。
-* **EXIF対応**: 写真の撮影日時（EXIF情報）を自動取得し、撮影日順に並び替え。
-  * アプリ起動時に自動で未取得ファイルをスキャン・修正します。
-* **無限スクロール**: 大量の写真もスムーズに閲覧可能。
-* **動画対応**: 動画のアップロードおよびサムネイル自動生成 (ffmpeg使用)。
-* **モバイルフレンドリー**: スマートフォンでの閲覧・操作に最適化されたUI。
+  * **Owner (管理者)**: 全権限。ユーザー管理（権限変更）、削除などが可能。
+  * **Family (家族)**: 写真・動画のアップロード、編集、タグ付けが可能。
+  * **Guest (ゲスト)**: 閲覧および「お気に入り (Like)」のみ可能。
+* **ペット管理**: ペットのプロフィール登録、自己紹介、アイコン設定。
+* **マルチメディア対応**:
+  * **写真**: EXIF情報自動取得、撮影日順ソート、HEIC対応、クロッピング機能。
+  * **動画**: サムネイル自動生成 (ffmpeg)、ブラウザでの再生に対応。
+* **非同期処理**: Celery + Redis による画像の最適化・変換処理のバックグラウンド実行。
+* **お気に入り**: 写真・動画へのお気に入り登録とフィルタリング。
+* **モバイル最適化**: スマートフォンでの操作性を重視したレスポンシブデザイン。
+
+## 技術スタック
+
+* **Backend**: Python 3.11 (Flask)
+* **Database**: PostgreSQL 15
+* **Queue/Cache**: Redis 7
+* **Worker**: Celery (非同期タスク)
+* **Frontend**: HTML5, CSS3 (Grid/Masonry), Vanilla JS
+* **Auth**: Authlib (Google OAuth 2.0)
+* **Infrastructure**: Docker, Docker Compose
 
 ## 必要要件
 
@@ -29,84 +40,73 @@ Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュ�
 1. Google Cloud Console でプロジェクトを作成。
 2. 「APIとサービス」>「認証情報」から **OAuth クライアント ID** を作成。
 3. **承認済みのリダイレクト URI** に以下を設定:
-    * ローカル: `http://localhost:5000/callback`
-    * 本番 (Cloudflare Tunnel等): `https://your-domain.com/callback`
+    * ローカル: `http://localhost:5000/auth/callback`
+    * 本番: `https://your-domain.com/auth/callback`
 
-### 2. 環境変数の設定 (`docker-compose.yml`)
+### 2. 環境変数の設定 (`.env`)
 
-`docker-compose.yml` を編集し、以下の環境変数を設定してください。
+ルート直下に `.env` ファイルを作成し、以下の環境変数を設定してください。
 
-```yaml
-environment:
-  - FLASK_APP=app.py
-  - FLASK_ENV=development
-  # Google Cloud Console で取得したIDとシークレット
-  - GOOGLE_CLIENT_ID=your_client_id
-  - GOOGLE_CLIENT_SECRET=your_client_secret
-  
-  # ログインを許可するメールアドレス (空欄の場合、Googleアカウントを持つ全員がログイン可能)
-  - ALLOWED_EMAILS=
-  
-  # 管理者権限（アップロード/編集/削除）を与えるメールアドレス (カンマ区切り)
-  - ADMIN_EMAILS=admin@example.com,family@example.com
-  
-  # セッション暗号化キー (本番ではランダムな文字列に変更推奨)
-  - FLASK_SECRET_KEY=dev_secret_key_change_in_prod
+```bash
+# Flask Config
+FLASK_APP=app:create_app
+FLASK_DEBUG=1
+FLASK_SECRET_KEY=change_this_to_random_secret_string
+
+# Database & Cache
+DATABASE_URL=postgresql://user:password@db:5432/thesalo_db
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# Owner Configuration (Initial Setup)
+# 最初にこのメールアドレスでログインしたユーザーが自動的に Owner 権限を取得します
+OWNER_EMAIL=your_email@example.com
+
+# Upload Settings
+MAX_IMAGE_SIZE=1920
 ```
 
 ### 3. アプリケーションの起動
 
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
-起動後、`http://localhost:5000` (または設定したドメイン) にアクセスしてください。
+起動後、`http://localhost:5000` にアクセスしてください。
 
-## ローカル開発ワークフロー
+### 4. ユーザー権限の設定
 
-コードの変更を行い、テスト・動作確認を行う手順は以下の通りです。
-
-1. コードを編集します。
-2. コンテナを再ビルドして起動します:
-
-    ```bash
-    docker-compose up --build -d
-    ```
-
-    ※ `--build` フラグを付けることで、コード変更を含んだ新しいイメージが作成されます。
-3. `docker-compose logs -f` でログを確認して、エラーが出ていないかチェックします。
-
-## 運用について
-
-* **データのバックアップ**:
-  * `uploads/`: 写真・動画の実体
-  * `thesalo_gallery.db`: データベース（メタデータ、コメント）
-  * これらを定期的にバックアップしてください。
-* **権限の変更**:
-  * 管理者を増やしたい場合は、`docker-compose.yml` の `ADMIN_EMAILS` に追記し、コンテナを再起動してください。
-
-## 技術スタック
-
-* **Backend**: Python 3.11 (Flask)
-* **Database**: SQLite
-* **Frontend**: HTML5, CSS3 (Grid Layout), Vanilla JS
-* **Auth**: Authlib (OpenID Connect)
-* **Image Processing**: Pillow, pillow-heif (HEIC対応)
-* **Video Processing**: ffmpeg
+1. `.env` の `OWNER_EMAIL` に設定したアカウントでログインします（自動的にOwnerになります）。
+2. アプリ内の「設定」→「ユーザー管理」にアクセスします。
+3. 他のユーザー（家族）がログインした後、リストから「家族にする」ボタンを押して権限を付与してください。
+   * 新規ユーザーはデフォルトで **Guest (閲覧のみ)** として登録されます。
 
 ## ディレクトリ構成
 
 ```text
 .
-├── app.py                # メインアプリケーション
-├── Dockerfile            # Docker環境定義
-├── docker-compose.yml    # コンテナ構成 & 環境変数
-├── requirements.txt      # 依存ライブラリ
-├── static/               # CSS, JS
-├── templates/            # HTMLテンプレート
-│   ├── index.html        # ギャラリー (無限スクロール, アップロード)
-│   ├── login.html        # ログインページ
-│   └── edit.html         # 編集ページ
-├── uploads/              # 写真・動画保存先 (Dockerボリューム)
-└── thesalo_gallery.db    # データベース
+├── app/                  # アプリケーションコード
+│   ├── blueprints/       # 機能モジュール (auth, core, media, pets)
+│   ├── models/           # データベースモデル
+│   ├── services/         # ビジネスロジック
+│   ├── static/           # CSS, JS, Images
+│   └── templates/        # HTMLテンプレート
+├── scripts/              # ユーティリティスクリプト
+├── uploads/              # メディア保存先 (Dockerボリューム)
+├── migrations/           # DBマイグレーションファイル
+├── docker-compose.yml    # コンテナ構成
+└── Dockerfile            # Dockerイメージ定義
 ```
+
+## 運用について
+
+* **バックアップ**:
+  * `uploads/` ディレクトリ（写真・動画の実体）
+  * `postgres_data` ボリューム（データベース）
+* **ログ確認**:
+  * `docker compose logs -f` でアプリとワーカーのログを確認できます。
