@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}設定 - Thesalo Gallery{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 0 auto;">
+    <div class="upload-card" style="text-align: left;">
+        <h2 style="margin-bottom: 24px;">設定</h2>
+
+        <!-- Admin Section -->
+        <div style="margin-bottom: 32px;">
+            <h4 style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">管理者メニュー
+            </h4>
+            <a href="{{ url_for('auth.list_users') }}" class="btn btn-primary"
+                style="width: 100%; text-align: center; text-decoration: none; display: block;">
+                👥 ユーザー管理
+            </a>
+        </div>
+
+        <!-- App Usage -->
+        <div style="margin-bottom: 32px;">
+            <h4 style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">アプリ利用状況
+            </h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div
+                    style="background: var(--bg-tertiary); padding: 16px; border-radius: var(--border-radius-md); text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--color-primary);">{{ media_count }}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">アップロード数</div>
+                </div>
+                <div
+                    style="background: var(--bg-tertiary); padding: 16px; border-radius: var(--border-radius-md); text-align: center;">
+                    <div style="font-size: 24px; font-weight: 700; color: var(--color-primary);">{{ storage_usage }}
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">使用容量</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security -->
+        <div style="margin-bottom: 32px;">
+            <h4 style="margin-bottom: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                アカウント・セキュリティ</h4>
+
+            <div style="margin-bottom: 16px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 8px;">連携アカウント</label>
+                <div
+                    style="display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--bg-tertiary); border-radius: var(--border-radius-md);">
+                    <img src="https://www.google.com/favicon.ico" width="20">
+                    <span style="color: var(--text-primary);">Google アカウントと連携済み</span>
+                    <span style="margin-left: auto; color: var(--color-success); font-size: 12px;">● 接続中</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div style="margin-top: 40px; border-top: 1px solid var(--color-danger); padding-top: 20px;">
+            <h4 style="margin-bottom: 12px; color: var(--color-danger);">危険なエリア</h4>
+            <button class="btn btn-secondary"
+                style="color: var(--color-danger); border-color: var(--color-danger); width: 100%;"
+                onclick="alert('アカウント削除機能は管理者へお問い合わせください。')">
+                アカウントを削除 (退会)
+            </button>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary" style="margin-top: 12px; width: 100%;">
+                ログアウト
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Add Pet Modal -->
+<!-- Pet Modal Removed -->
+
+<style>
+    /* Fix for select options in dark modal having white text on white bg */
+    #add-pet-modal select option {
+        color: #333;
+        background-color: #fff;
+    }
+</style>
+{% endblock %}

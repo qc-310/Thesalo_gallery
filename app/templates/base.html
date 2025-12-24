@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}Thesalo Gallery{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=16">
+
+</head>
+
+<body>
+
+    <header>
+        <div class="header-container">
+            <a href="{{ url_for('core.index') }}" class="logo"
+                style="text-decoration: none; display: flex; align-items: center; gap: 8px;">
+                <img src="{{ url_for('static', filename='images/app_icon.jpg') }}" alt="Logo"
+                    style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">
+                Thesalo Gallery
+            </a>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                {% if current_user.is_authenticated %}
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <!-- Avatar -->
+                    <div
+                        style="width: 32px; height: 32px; border-radius: 50%; overflow: hidden; background: var(--bg-tertiary); border: 1px solid var(--border-color);">
+                        {% if current_user.avatar_url %}
+                        <img src="{{ url_for('media.serve_file', filename=current_user.avatar_url) }}"
+                            style="width: 100%; height: 100%; object-fit: cover;">
+                        {% else %}
+                        <div
+                            style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                            👤</div>
+                        {% endif %}
+                    </div>
+                    <!-- Name -->
+                    <span style="font-size: 14px; font-weight: 500; color: var(--text-primary);">
+                        {{ current_user.display_name or current_user.name }}
+                    </span>
+                </div>
+                <a href="{{ url_for('auth.logout') }}"
+                    style="font-size: 12px; text-decoration: none; color: var(--text-secondary); background: var(--bg-tertiary); padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-color);">ログアウト</a>
+
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    {% if current_user.is_authenticated %}
+    <nav class="main-nav">
+        <div class="nav-container">
+            <ul class="nav-list">
+                <li><a href="{{ url_for('core.index') }}" class="nav-link">ホーム</a></li>
+                <li><a href="{{ url_for('pets.list_pets') }}" class="nav-link">ペット紹介</a></li>
+                <li><a href="{{ url_for('core.profile') }}" class="nav-link">プロフィール</a></li>
+                {% if current_user.is_owner %}
+                <li><a href="{{ url_for('core.settings') }}" class="nav-link">設定</a></li>
+                {% endif %}
+            </ul>
+            <!-- Filters moved to index page -->
+            <div style="flex-grow: 1;"></div>
+            <!-- Spacer to keep layout if needed, though nav-container has space-between -->
+        </div>
+    </nav>
+    {% endif %}
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flashes">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <!-- Lightbox (Common for now) -->
+    <!-- Lightbox (Common for now) -->
+    <div id="lightbox" class="lightbox">
+        <button class="lightbox-close">&times;</button>
+        <button class="lightbox-nav lightbox-prev">&#10094;</button>
+        <div class="lightbox-content">
+            <img id="lightbox-img" class="lightbox-media" src="" alt="">
+            <video id="lightbox-video" class="lightbox-media" controls playsinline></video>
+        </div>
+        <button class="lightbox-nav lightbox-next">&#10095;</button>
+        <div id="lightbox-info"
+            style="position: absolute; bottom: 20px; left: 0; right: 0; text-align: center; color: white; padding: 0 40px; pointer-events: none;">
+            <p id="lightbox-desc" style="font-size: 16px; margin-bottom: 8px; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
+            </p>
+            <div id="lightbox-meta" style="font-size: 12px; opacity: 0.8; text-shadow: 0 1px 3px rgba(0,0,0,0.8);">
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Modals (Global) -->
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="lightbox" style="z-index: 2000;">
+        <div class="edit-modal-content"
+            style="text-align: center; padding: 24px; max-width: 400px; border: 1px solid var(--border-color);">
+            <div style="font-size: 40px; margin-bottom: 16px;">⚠️</div>
+            <h3 style="color: var(--text-primary); margin-bottom: 12px; font-size: 18px;">確認</h3>
+            <p id="confirm-message" style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;">
+                本当に実行しますか？</p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button onclick="closeConfirmModal()" class="btn btn-secondary">キャンセル</button>
+                <button id="confirm-ok-btn" class="btn btn-danger"
+                    style="background-color: var(--color-danger);">実行</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generic Message Modal -->
+    <div id="message-modal" class="lightbox" style="z-index: 2005;">
+        <div class="edit-modal-content"
+            style="text-align: center; padding: 24px; max-width: 400px; border: 1px solid var(--border-color);">
+            <div style="font-size: 40px; margin-bottom: 16px;">✨</div>
+            <h3 id="message-modal-title" style="color: var(--text-primary); margin-bottom: 12px; font-size: 18px;">完了
+            </h3>
+            <p id="message-modal-text" style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;"></p>
+            <button onclick="closeMessageModal()" class="btn btn-primary" style="min-width: 100px;">OK</button>
+        </div>
+    </div>
+
+    <!-- Generic Error Modal -->
+    <div id="error-modal" class="lightbox" style="z-index: 2010;">
+        <div class="edit-modal-content"
+            style="text-align: center; padding: 24px; max-width: 400px; border: 1px solid var(--color-danger);">
+            <div style="font-size: 40px; margin-bottom: 16px;">⚠️</div>
+            <h3 style="color: var(--color-danger); margin-bottom: 12px; font-size: 18px;">エラー</h3>
+            <p id="error-modal-text" style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;"></p>
+            <button onclick="closeErrorModal()" class="btn btn-secondary" style="min-width: 100px;">閉じる</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}?v=5"></script>
+    <script>
+
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
