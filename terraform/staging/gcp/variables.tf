@@ -38,3 +38,15 @@ variable "owner_email" {
   type        = string
   sensitive   = true
 }
+
+variable "custom_domain" {
+  description = "Custom domain for Cloud Run service mapping"
+  type        = string
+  default     = ""
+}
+
+variable "billing_account" {
+  description = "Billing Account ID (optional)"
+  type        = string
+  default     = ""
+}

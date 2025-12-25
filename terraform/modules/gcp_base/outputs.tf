@@ -17,3 +17,7 @@ output "cloud_tasks_queue_id" {
 output "cloud_run_url" {
   value = google_cloud_run_service.default.status[0].url
 }
+
+output "domain_mapping_records" {
+  value = length(google_cloud_run_domain_mapping.default) > 0 ? google_cloud_run_domain_mapping.default[0].status[0].resource_records : []
+}
