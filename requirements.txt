@@ -1,24 +1,33 @@
+# Core Framework
 Flask==3.0.0
 Werkzeug==3.0.1
-Authlib==1.2.1
-requests==2.31.0
 Flask-Login==0.6.3
-Pillow==10.1.0
-pillow-heif==0.13.1
-Flask-SQLAlchemy==3.1.1
-Flask-Migrate==4.0.5
-SQLAlchemy==2.0.23
-psycopg2-binary==2.9.9
-Celery==5.3.6
-redis==5.0.1
-gunicorn==21.2.0
-python-dotenv==1.0.0
 Flask-WTF==1.2.1
 email-validator==2.1.0.post1
+
+# Database
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+SQLAlchemy>=2.0.36
+psycopg2-binary>=2.9.9
+
+# Google Cloud & Storage
+google-cloud-storage==2.13.0
+google-cloud-tasks==2.14.0
+
+# Image Processing
+Pillow>=10.3.0
+pillow-heif>=0.18.0
+# Magic number detection (Mime types)
+python-magic-bin>=0.4.14; sys_platform == 'win32'
+python-magic==0.4.27; sys_platform != 'win32'
+
+# Utilities
+Authlib==1.2.1
+requests==2.31.0
+python-dotenv==1.0.0
 uuid6==2023.5.2
-pytest==7.4.3
-pytest-flask==1.3.0
-pytest-mock==3.12.0
-python-magic==0.4.27
-pytest-cov==4.1.0
-pytest-playwright==0.4.4
+python-dateutil==2.8.2
+
+# Production Server
+gunicorn==21.2.0

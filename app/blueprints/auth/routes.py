@@ -46,29 +46,33 @@ def authorize():
 
 @auth_bp.route('/login_page')
 def login_page():
-    return render_template('login.html')
+    from flask import current_app
+    bypass = current_app.config.get('BYPASS_AUTH', False)
+    return render_template('login.html', bypass_auth=bypass)
 
 @auth_bp.route('/dev/login', methods=['GET'])
 def dev_login():
     from flask import current_app
-    if not current_app.debug and not current_app.config.get('TESTING'):
+    if not current_app.config.get('BYPASS_AUTH'):
          return "Not allowed", 403
     
     # Create or Get dummy user
-    email = request.args.get('email', 'dev@example.com')
+    email = request.args.get('email', 'owner@example.com')
     user = db.session.execute(db.select(User).filter_by(email=email)).scalar_one_or_none()
     if not user:
         user = User(
             id=uuid6.uuid7(),
             email=email,
-            name='Dev User',
+            name='Dev Owner',
             google_id=f'dev_{uuid6.uuid7()}',
-            avatar_url=None
+            avatar_url=None,
+            role='owner' # Force owner role
         )
         db.session.add(user)
         db.session.commit()
     
     login_user(user)
+    flash(f'Logged in as Dev Owner ({email})', 'success')
     return redirect(url_for('core.index'))
 
 @auth_bp.route('/users')

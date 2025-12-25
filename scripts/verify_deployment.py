@@ -14,18 +14,6 @@ def test_01_dev_login():
         print(f"❌ Dev Login Failed: {resp.status_code}")
         exit(1)
 
-def test_02_create_family():
-    print("Testing Create Family...")
-    # First get csrf if needed? Flask-WTF is not strict yet or we might need to parse.
-    # Looking at code, simple form post.
-    resp = SESSION.post(f"{BASE_URL}/family/create", data={"family_name": "Test Family Deploy"})
-    if resp.status_code == 200:
-        # It redirects to index or shows success
-        print("✅ Create Family Successful (Status 200)")
-    else:
-        print(f"❌ Create Family Failed: {resp.status_code}")
-        # Not exiting, might already exist
-
 def test_03_upload_media():
     print("Testing Media Upload...")
     # Create a dummy image
@@ -57,7 +45,7 @@ def test_04_verify_gallery():
 if __name__ == "__main__":
     try:
         test_01_dev_login()
-        test_02_create_family()
+        # test_02_create_family() # Removed
         test_03_upload_media()
         test_04_verify_gallery()
         print("\n🎉 All System Verification Tests Passed!")

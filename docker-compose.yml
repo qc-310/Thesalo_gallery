@@ -8,12 +8,16 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - FLASK_APP=app:create_app
-      - FLASK_DEBUG=1
-      - DATABASE_URL=postgresql://user:password@db:5432/thesalo_db
-      - REDIS_URL=redis://redis:6379/0
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - FLASK_APP=${FLASK_APP:-app:create_app}
+      - FLASK_DEBUG=${FLASK_DEBUG:-1}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://user:password@db:5432/thesalo_db}
+
+      # Local Dev Config (Defaults)
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-local}
+      - TASK_RUNNER=${TASK_RUNNER:-sync}
+      - BYPASS_AUTH=${BYPASS_AUTH:-true}
+
+      # Secrets (Must be supplied in .env)
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - FLASK_SECRET_KEY=${FLASK_SECRET_KEY}
@@ -24,52 +28,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     restart: always
-
-  worker:
-    build: .
-    container_name: thesalo-worker
-    restart: always
-    command: celery -A celery_app.celery_app worker --loglevel=info
-    environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/thesalo_db
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MAX_IMAGE_SIZE=${MAX_IMAGE_SIZE:-1920}
-    volumes:
-      - .:/app
-      - ./uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   db:
     image: postgres:15-alpine
     container_name: thesalo-db
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=thesalo_db
+      - POSTGRES_USER=${POSTGRES_USER:-user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+      - POSTGRES_DB=${POSTGRES_DB:-thesalo_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U user -d thesalo_db" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: always
-
-  redis:
-    image: redis:7-alpine
-    container_name: thesalo-redis
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-thesalo_db}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -77,4 +48,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:

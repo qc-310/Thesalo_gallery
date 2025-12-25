@@ -1,29 +1,99 @@
-# アップロードファイルはGit対象外
-uploads/
-
-# Python キャッシュ
-__pycache__/
-*.pyc
-
-# 仮想環境（作る場合）
-venv/
-.env
-
-# OS系
+# General
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Tunnel binary
-cloudflared.exe
-cloudflared-windows-amd64.exe
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Flask
+instance/
+.webassets-cache
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+.env
+
+# Environment Variables & Secrets
+.env
+.env.*
+*.env
+! .env.example
 
 # Database
 *.db
 *.sqlite3
+*.sqlite
 
-# Environment variables
-.env
+# Uploads & Static Content
+uploads/
+app/static/thumbnails/
 
-# Editor directories
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.crash.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# IDEs
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Cloudflare / Tunnel
+cloudflared.exe
+cloudflared-windows-amd64.exe
+
+# Logs
+*.log
+logs/
+
+# Testing & Coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+htmlcov/
+
+# Node / JS (Future proofing)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
