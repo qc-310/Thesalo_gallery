@@ -11,7 +11,7 @@
             style="display:none; margin-bottom: 20px; padding: 15px; border-radius: 8px; text-align: center;"></div>
 
         <form id="upload-form" class="upload-form" method="post" action="{{ url_for('media.upload') }}"
-            enctype="multipart/form-data">
+            enctype="multipart/form-data" data-storage-backend="{{ config['STORAGE_BACKEND'] }}">
             <!-- Family Select Logic could go here if multiple families -->
 
             <label class="btn btn-secondary file-input-wrapper">
