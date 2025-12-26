@@ -144,7 +144,13 @@ class MediaService:
         worker_url = current_app.config['CLOUD_RUN_SERVICE_URL']
         
         if not worker_url:
-            print("Warning: CLOUD_RUN_SERVICE_URL not set. Task not created.")
+            # Fallback to request.host_url if available (handles dynamic domains)
+            from flask import request
+            if request:
+                worker_url = request.host_url.rstrip('/')
+
+        if not worker_url:
+            print("Warning: CLOUD_RUN_SERVICE_URL not set and request context missing. Task not created.")
             return
 
         # Cloud Run Worker URL (e.g., https://service-url/handlers/process-media)
