@@ -241,6 +241,12 @@ resource "google_service_account_iam_member" "sa_user_self" {
   member             = "serviceAccount:${google_service_account.app_sa.email}"
 }
 
+resource "google_service_account_iam_member" "sa_token_creator" {
+  service_account_id = google_service_account.app_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.app_sa.email}"
+}
+
 # 6. Cloud Run Service
 resource "google_cloud_run_service" "default" {
   name       = "thesalo-web${local.suffix}"
@@ -273,6 +279,10 @@ resource "google_cloud_run_service" "default" {
         env {
           name  = "CLOUD_TASKS_QUEUE_PATH"
           value = google_cloud_tasks_queue.default.id
+        }
+        env {
+          name  = "STORAGE_BACKEND"
+          value = "gcs"
         }
         # Secrets
         env {
