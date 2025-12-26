@@ -3,6 +3,10 @@ from app.utils.decorators import role_required
 from flask_login import login_required, current_user
 from app.services import MediaService
 import uuid6
+import google.auth
+from google.cloud import storage
+from google.auth import impersonated_credentials
+import os
 
 core_bp = Blueprint('core', __name__)
 media_service = MediaService()
@@ -40,9 +44,41 @@ def profile():
             file = request.files['avatar']
             if file and file.filename != '':
                 filename = secure_filename(f"avatar_{current_user.id}_{uuid6.uuid6()}.png")
-                # Save to uploads folder (make sure to use absolute path provided by config)
-                file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
-                current_user.avatar_url = filename
+                
+                if current_app.config.get('STORAGE_BACKEND') == 'gcs':
+                    # GCS Logic - Inlined for minimal impact, eventually ensure this is shared
+                    try:
+                        credentials, project = google.auth.default()
+                        sa_email = os.environ.get('SERVICE_ACCOUNT_EMAIL') or f"thesalo-app-sa@{current_app.config['GOOGLE_CLOUD_PROJECT']}.iam.gserviceaccount.com"
+                        credentials = impersonated_credentials.Credentials(
+                            source_credentials=credentials,
+                            target_principal=sa_email,
+                            target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                            lifetime=3600
+                        )
+                        storage_client = storage.Client(credentials=credentials)
+                        bucket_name = current_app.config['GCS_BUCKET_NAME']
+                        bucket = storage_client.bucket(bucket_name)
+                        blob = bucket.blob(f"avatars/{filename}")
+                        file.seek(0)
+                        blob.upload_from_file(file)
+                        current_user.avatar_url = f"avatars/{filename}"
+                    except Exception as e:
+                        print(f"GCS Upload Error: {e}")
+                        # Fallback or Error? 
+                        # Giving error message is better
+                        flash(f'アイコンのアップロードに失敗しました: {e}', 'error')
+                        return redirect(url_for('core.profile'))
+                else:
+                    # Save to uploads folder (make sure to use absolute path provided by config)
+                    # For local we might want avatars/ prefix too if we want consistence?
+                    # Original code was root relative? os.path.join(UPLOAD_FOLDER, filename)
+                    # Let's keep original local behavior but maybe prefix with avatars/ for cleanness if I can?
+                    # The original code: file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+                    # It saved directly to uploads/. I'll keep it as is to avoid breaking existing local avatars paths
+                    # unless I move them.
+                    file.save(os.path.join(current_app.config['UPLOAD_FOLDER'], filename))
+                    current_user.avatar_url = filename
         
         try:
             db.session.commit()

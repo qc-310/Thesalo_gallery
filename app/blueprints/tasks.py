@@ -96,14 +96,19 @@ def _process_image(media, file_path, bucket):
         exif = img._getexif()
         taken_at = None
         if exif:
-             # 36867: DateTimeOriginal, 306: DateTime
-            dt_str = exif.get(36867) or exif.get(306)
+             # 36867: DateTimeOriginal, 36868: DateTimeDigitized, 306: DateTime
+            dt_str = exif.get(36867) or exif.get(36868) or exif.get(306)
             if dt_str:
                 try:
                     taken_at = dt_str.replace(":", "-", 2).replace(" ", "T")
                     media.taken_at = taken_at
-                except:
-                    pass
+                    print(f"EXIF Date found for {media.id}: {taken_at}")
+                except Exception as e:
+                    print(f"Error parsing EXIF date '{dt_str}' for {media.id}: {e}")
+            else:
+                print(f"No valid date EXIF found for {media.id}. Keys present: {list(exif.keys())}")
+        else:
+            print(f"No EXIF data found for {media.id}")
         
         # Resize/Convert
         max_size = 1920
