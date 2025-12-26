@@ -129,7 +129,8 @@ class MediaService:
         return blob.generate_signed_url(
             version="v4",
             expiration=datetime.timedelta(seconds=expiration),
-            method="GET"
+            method="GET",
+            service_account_email=self._get_service_account_email()
         )
 
     def _save_to_local(self, file, object_name):
