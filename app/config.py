@@ -22,7 +22,7 @@ class Config:
 
     # Job & Storage Configuration
     # 'gcs' or 'local'
-    STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'local')
+    STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'gcs')
     # 'cloud_tasks' or 'sync'
     # 'cloud_tasks' or 'sync'
     TASK_RUNNER = os.environ.get('TASK_RUNNER', 'cloud_tasks')

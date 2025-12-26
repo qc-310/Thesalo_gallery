@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_from_directory, current_app, abort, render_template
+from flask import Blueprint, request, jsonify, send_from_directory, current_app, abort, render_template, redirect
 from flask_login import login_required, current_user
 from app.services import MediaService
 from app.utils.decorators import role_required
@@ -52,11 +52,28 @@ def serve_file(filename):
     # TODO: Add strict permission check (does user belong to family in filename path?)
     # filename likely starts with family_uuid/...
     # For now, strict login required is enforced.
+    
+    if current_app.config['STORAGE_BACKEND'] == 'gcs':
+        try:
+            url = media_service.generate_signed_url(filename)
+            return redirect(url)
+        except Exception as e:
+            print(f"Error generating signed URL: {e}")
+            abort(404)
+            
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 @media_bp.route('/thumb/<path:filename>')
 @login_required
 def serve_thumbnail(filename):
+    if current_app.config['STORAGE_BACKEND'] == 'gcs':
+        try:
+            # Thumbnails same bucket? assuming yes or same logic
+            url = media_service.generate_signed_url(filename)
+            return redirect(url)
+        except Exception as e:
+            print(f"Error generating thumbnail signed URL: {e}")
+            abort(404)
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 @media_bp.route('/<string:media_id>/update', methods=['POST'])
