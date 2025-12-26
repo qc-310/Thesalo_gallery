@@ -98,3 +98,9 @@ resource "google_project_iam_member" "devops_sa_iam_sa_user" {
   role    = "roles/iam.serviceAccountUser"
   member  = "serviceAccount:${google_service_account.devops_sa.email}"
 }
+
+resource "google_project_iam_member" "devops_sa_iam_sa_admin" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountAdmin"
+  member  = "serviceAccount:${google_service_account.devops_sa.email}"
+}

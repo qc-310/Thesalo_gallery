@@ -178,6 +178,9 @@ class MediaService:
             print(f"Failed to create cloud task: {e}")
 
     def _get_service_account_email(self):
+        sa_email = os.environ.get('SERVICE_ACCOUNT_EMAIL')
+        if sa_email:
+            return sa_email
         return f"thesalo-app-sa@{current_app.config['GOOGLE_CLOUD_PROJECT']}.iam.gserviceaccount.com"
 
     def get_global_media(self, limit=20, offset=0, sort_by='created_at_desc', filter_type='all', user_id=None):

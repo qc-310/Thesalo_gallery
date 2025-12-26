@@ -247,6 +247,13 @@ resource "google_service_account_iam_member" "sa_token_creator" {
   member             = "serviceAccount:${google_service_account.app_sa.email}"
 }
 
+# Grant App SA permission to act as itself (Project Level for broader compatibility)
+resource "google_project_iam_member" "sa_user_project" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.app_sa.email}"
+}
+
 # 6. Cloud Run Service
 resource "google_cloud_run_service" "default" {
   name       = "thesalo-web${local.suffix}"
@@ -334,6 +341,10 @@ resource "google_cloud_run_service" "default" {
               key  = "latest"
             }
           }
+        }
+        env {
+          name  = "SERVICE_ACCOUNT_EMAIL"
+          value = google_service_account.app_sa.email
         }
       }
     }
