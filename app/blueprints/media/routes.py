@@ -57,9 +57,15 @@ def sign_upload():
     filename = data.get('filename')
     mime_type = data.get('mime_type')
     
-    if not filename or not mime_type:
-        return jsonify({'error': 'Missing filename or mime_type'}), 400
-        
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+
+    if not mime_type:
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+    
     try:
         result = media_service.generate_upload_signed_url(filename, mime_type)
         return jsonify(result)
