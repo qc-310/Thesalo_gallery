@@ -143,7 +143,7 @@ class MediaService:
         blob = bucket.blob(object_name)
         blob.upload_from_file(file, content_type=mime_type)
 
-    def generate_signed_url(self, object_name, expiration=3600):
+    def generate_signed_url(self, object_name, expiration=3600, method="GET", content_type=None):
         """Generate a signed URL for a GCS blob."""
         storage_client = self._get_storage_client()
         bucket_name = current_app.config['GCS_BUCKET_NAME']
@@ -153,8 +153,72 @@ class MediaService:
         return blob.generate_signed_url(
             version="v4",
             expiration=timedelta(seconds=expiration),
-            method="GET"
+            method=method,
+            content_type=content_type
         )
+
+    def generate_upload_signed_url(self, filename: str, mime_type: str):
+        """Generate a PUT signed URL for direct upload."""
+        if not self.allowed_file(filename):
+             raise ValueError("Invalid file extension")
+
+        # Determine path (same logic as upload_media)
+        now = datetime.now()
+        yyyy = now.strftime('%Y')
+        mm = now.strftime('%m')
+        
+        clean_name = secure_filename(filename)
+        base_name = Path(clean_name).stem
+        ext = Path(clean_name).suffix
+        
+        # We can't easily check for existence in GCS efficiently in a loop for signed URL generation 
+        # without network calls. For direct upload, we'll use a UUID to ensure uniqueness 
+        # to avoid collisions and overwrites.
+        unique_id = uuid6.uuid7().hex[:8]
+        final_filename = f"{base_name}_{unique_id}{ext}"
+        object_name = f"galleries/{yyyy}/{mm}/{final_filename}"
+        
+        url = self.generate_signed_url(
+            object_name, 
+            method="PUT", 
+            content_type=mime_type
+        )
+        
+        return {
+            'url': url,
+            'object_name': object_name,
+            'filename': final_filename
+        }
+
+    def finalize_upload(self, object_name: str, original_filename: str, mime_type: str, file_size: int, uploader: User, description: str = None):
+        """Create Media record after successful direct upload."""
+        
+        # Verify existence (optional but recommended)
+        if current_app.config['STORAGE_BACKEND'] == 'gcs':
+            if not self._gcs_exists(object_name):
+                raise ValueError("File not found in storage. Upload may have failed.")
+        
+        media = Media(
+            uploader_id=uploader.id,
+            filename=object_name, 
+            original_filename=original_filename,
+            mime_type=mime_type,
+            file_size_bytes=file_size,
+            status='processing',
+            description=description
+        )
+        db.session.add(media)
+        db.session.commit()
+        
+        # Trigger Task
+        if current_app.config['TASK_RUNNER'] == 'sync':
+            from app.blueprints.tasks import _process_media_logic
+            print(f"[Sync] Processing media {media.id} locally...")
+            _process_media_logic(str(media.id))
+        else:
+            self._create_cloud_task(media.id)
+            
+        return media
 
     def _save_to_local(self, file, object_name):
         # object_name = galleries/2023/12/foo.jpg

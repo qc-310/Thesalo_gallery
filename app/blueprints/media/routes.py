@@ -46,6 +46,60 @@ def upload():
              
     return jsonify({'uploaded': results})
 
+@media_bp.route('/upload/sign', methods=['POST'])
+@login_required
+@role_required('family')
+def sign_upload():
+    if current_app.config.get('STORAGE_BACKEND') != 'gcs':
+        return jsonify({'error': 'Direct upload only supported for GCS'}), 400
+        
+    data = request.get_json()
+    filename = data.get('filename')
+    mime_type = data.get('mime_type')
+    
+    if not filename or not mime_type:
+        return jsonify({'error': 'Missing filename or mime_type'}), 400
+        
+    try:
+        result = media_service.generate_upload_signed_url(filename, mime_type)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@media_bp.route('/upload/finalize', methods=['POST'])
+@login_required
+@role_required('family')
+def finalize_upload():
+    data = request.get_json()
+    
+    object_name = data.get('object_name')
+    original_filename = data.get('original_filename')
+    mime_type = data.get('mime_type')
+    file_size = data.get('file_size')
+    description = data.get('description')
+    
+    # Basic validation
+    if not all([object_name, original_filename, mime_type, file_size]):
+        return jsonify({'error': 'Missing required fields'}), 400
+        
+    try:
+        media = media_service.finalize_upload(
+            object_name=object_name,
+            original_filename=original_filename,
+            mime_type=mime_type,
+            file_size=int(file_size),
+            uploader=current_user,
+            description=description
+        )
+        return jsonify({
+            'id': str(media.id),
+            'filename': media.filename,
+            'status': media.status
+        })
+    except Exception as e:
+        print(f"Finalize error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @media_bp.route('/file/<path:filename>')
 @login_required
 def serve_file(filename):
