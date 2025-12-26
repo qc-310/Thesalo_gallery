@@ -77,12 +77,28 @@ docker compose up --build -d
 起動後、`http://localhost:5000` にアクセスしてください。
 開発モード (`BYPASS_AUTH=true`) の場合、ログイン画面に表示される「Dev Owner Login」ボタンで即座に管理者としてログインできます。
 
-## デプロイ (Production)
+## デプロイ (CI/CD)
 
-本番環境へのデプロイは **Terraform** と **GitHub Actions** によって管理されています。
+GitHub Actions と Terraform を連携させた最新のCI/CDパイプラインを構築済みです。
 
-1. **Infrastructure**: `terraform/` ディレクトリ内のコードで Cloud Run, Supabase, GCS 等を構築します。
-2. **CI/CD**: GitHub Actions により、タグ (`v*`) のプッシュをトリガーとして本番デプロイが行われます。
+### 1. Environments
+
+* **Staging**: `develop` ブランチが更新されると自動デプロイされます。 (`staging.thesalo-gallery.com`)
+* **Production**: `v*` (例: `v3.0.0`) のタグがプッシュされると自動デプロイされます。 (`www.thesalo-gallery.com`)
+
+### 2. Workflow
+
+1. **CI Check**: `feature/*` ブランチのPR作成時に静的解析 (CodeQL, Flake8) とテストを実行。
+2. **Staging Deploy**: `develop` マージ時にDockerビルド・セキュリティスキャン (Trivy)・Terraform適用を実行。
+3. **Production Deploy**: リリースタグ作成時に本番環境へ安全にプロモート。
+
+### 3. コスト最適化 (Cost Optimization)
+
+個人開発での運用を考慮し、Terraformレベルで以下の最適化を適用しています。
+
+* **Cloud Run**: `min_instances = 0` (スケール・トゥ・ゼロ) により、アクセスがない時間は課金されません。
+* **Limits**: インスタンス数 (`max=1`) とリソース (`512Mi`) を制限し、意図しない課金爆発を防ぎます。
+* **GC**: Artifact Registry (直近5世代のみ保持) や Cloud Storage (不要なアップロード断片の削除) の自動掃除ポリシーを適用済。
 
 ## ディレクトリ構成
 

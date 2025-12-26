@@ -21,7 +21,15 @@
   - **Dev Login**: 開発時にワンクリックで管理者としてログインできるバイパス機能を追加しました。
 - **インフラ (Infrastructure)**:
   - **Terraform導入**: GCPリソース (Cloud Run, GCS, Secret Manager, Cloud Tasks) の構成管理をコード化しました。
+  - **マルチ環境対応**: `staging` と `prod` の2環境を完全に分離し、Terraform Workspaceを用いずにディレクトリベースで分離しました。
+  - **Cloudflare連携**: DNSレコードとProxy設定をTerraformで管理するようにしました。
+  - **コスト最適化**: Cloud Runのインスタンス数制限 (Min 0/Max 1)、予算アラート、Artifact Registryの自動掃除ポリシーを適用しました。
+  - **Keyless CI/CD**: Workload Identity Federation (OIDC) を導入し、Service Account Key jsonを廃止しました。
   - **Secret Manager対応**: データベースURLやOAuthシークレットなどの機密情報を Secret Manager から安全に注入する仕組みを構築しました。
+- **CI/CD**:
+  - **Feature Flow**: PR作成時にCodeQL, Flake8, pytestを実行するワークフローを追加。
+  - **Staging Pipeline**: `develop` ブランチへのプッシュでStaging環境へ自動デプロイ。
+  - **Production Pipeline**: `v*` タグのプッシュでProduction環境へ自動デプロイ。
 - **ドキュメント**:
   - データ設計書 (`data_design.md`)、処理ロジック (`processing_logic.md`)、システム構成図 (`system_architecture.md`) を現在のアーキテクチャに合わせて全面改訂しました。
 
