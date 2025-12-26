@@ -1,6 +1,6 @@
 # Builder stage
 # Builder stage
-FROM python:3.11-slim as builder
+FROM python:3.14-slim as builder
 
 
 # Install system dependencies
@@ -18,7 +18,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --no-compile --user -r requirements.txt
 
 # Runtime stage
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1
 
