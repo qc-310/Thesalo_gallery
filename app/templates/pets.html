@@ -30,8 +30,9 @@
                         style="width: 100%; height: 100%; background-image: url('{{ pet.avatar_url }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
                     </div>
                     {% else %}
-                    <div role="img" aria-label="{{ pet.name }}"
-                        style="width: 100%; height: 100%; background-image: url('{{ url_for('media.serve_file', filename=pet.avatar_url) }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+                    <div role="img" aria-label="{{ pet.name }}" style="width: 100%; height: 100%; background-image: url('{{ url_for('media.serve_file',
+                        filename=pet.avatar_url) }}'); background-size: cover; background-position: center;
+                        background-repeat: no-repeat;">
                     </div>
                     {% endif %}
                     {% else %}
