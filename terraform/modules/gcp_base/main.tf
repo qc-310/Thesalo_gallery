@@ -284,6 +284,11 @@ resource "google_cloud_run_service" "default" {
           name  = "STORAGE_BACKEND"
           value = "gcs"
         }
+        env {
+          name = "CLOUD_RUN_SERVICE_URL"
+          # Avoid self-reference cycle; use custom domain if available, otherwise rely on app fallback
+          value = var.custom_domain != "" ? "https://${var.custom_domain}" : ""
+        }
         # Secrets
         env {
           name = "DATABASE_URL"
