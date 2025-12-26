@@ -21,9 +21,10 @@ resource "google_project_service" "apis" {
     "cloudtasks.googleapis.com",
     "storage.googleapis.com",
     "iam.googleapis.com",
-    "iam.googleapis.com",
     "secretmanager.googleapis.com",
-    "billingbudgets.googleapis.com" # Required for Budgets
+    "billingbudgets.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
+    "serviceusage.googleapis.com" # Required for Budgets
   ])
   service            = each.key
   disable_on_destroy = false
