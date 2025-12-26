@@ -13,7 +13,7 @@ permissions:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} # thesalo-gallery
-  REGION: us-west1
+  REGION: asia-northeast1
   REPO_NAME: thesalo-repo-staging
   IMAGE_NAME: thesalo-web
   WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
