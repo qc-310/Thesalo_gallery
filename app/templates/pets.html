@@ -24,9 +24,17 @@
                     style="width: 280px; height: 280px; border-radius: 50%; overflow: hidden; background: var(--bg-tertiary); border: 4px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative;">
                     {% if pet.avatar_url %}
                     <!-- Background Image Avatar (Prevents distortion) -->
+                    <!-- Background Image Avatar (Prevents distortion) -->
+                    {% if pet.avatar_url.startswith('http') %}
                     <div role="img" aria-label="{{ pet.name }}"
-                        style="width: 100%; height: 100%; background-image: url('{{ url_for('media.serve_file', filename=pet.avatar_url) }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+                        style="width: 100%; height: 100%; background-image: url('{{ pet.avatar_url }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
                     </div>
+                    {% else %}
+                    {% set bg_url = url_for('media.serve_file', filename=pet.avatar_url) %}
+                    <div role="img" aria-label="{{ pet.name }}"
+                        style="width: 100%; height: 100%; background-image: url('{{ bg_url }}'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+                    </div>
+                    {% endif %}
                     {% else %}
                     <!-- Emoji Fallback -->
                     <div
@@ -69,8 +77,11 @@
 
                     <!-- Edit (Yellow/Orange) -->
                     {% if current_user.is_family %}
-                    <button
-                        onclick="openEditPetModal('{{ pet.id }}', '{{ pet.name }}', '{{ pet.type }}', '{{ pet.breed or '' }}', '{{ pet.gender or '' }}', '{{ pet.birth_date or '' }}', '{{ pet.adoption_date or '' }}', `{{ pet.description or '' }}`, '{{ url_for('media.serve_file', filename=pet.avatar_url) if pet.avatar_url else '' }}')"
+                    <button class="edit-pet-btn" data-id="{{ pet.id }}" data-name="{{ pet.name }}"
+                        data-type="{{ pet.type }}" data-breed="{{ pet.breed or '' }}"
+                        data-gender="{{ pet.gender or '' }}" data-birth="{{ pet.birth_date or '' }}"
+                        data-adoption="{{ pet.adoption_date or '' }}" data-description="{{ pet.description or '' }}"
+                        data-avatar="{{ pet.avatar_url or '' }}" onclick="openEditPetModal(this)"
                         style="width: 80px; height: 80px; border-radius: 50%; border: none; background: #f59e0b; color: white; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; box-shadow: 0 4px 6px rgba(245, 158, 11, 0.3); transition: transform 0.2s;">
                         <span style="font-size: 20px; margin-bottom: 2px;">✏️</span>
                         編集
@@ -214,10 +225,21 @@
         modal.style.visibility = 'visible';
     }
 
-    function openEditPetModal(petId, name, type, breed, gender, birth, adoption, description, avatarUrl) {
+    function openEditPetModal(btn) {
         const modal = document.getElementById('add-pet-modal');
         const form = document.getElementById('add-pet-form');
         const preview = document.getElementById('avatar-preview');
+
+        // Extract data from dataset
+        const petId = btn.dataset.id;
+        const name = btn.dataset.name;
+        const type = btn.dataset.type;
+        const breed = btn.dataset.breed;
+        const gender = btn.dataset.gender;
+        const birth = btn.dataset.birth;
+        const adoption = btn.dataset.adoption;
+        const description = btn.dataset.description;
+        const avatarUrlRaw = btn.dataset.avatar;
 
         document.getElementById('pet-modal-title').textContent = 'ペット情報';
         document.getElementById('pet-submit-btn').textContent = '更新する';
@@ -231,8 +253,14 @@
         document.getElementById('pet-description').value = description || '';
 
         // Set preview
-        if (avatarUrl && avatarUrl !== 'None' && avatarUrl !== '') {
-            preview.innerHTML = `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover;">`;
+        if (avatarUrlRaw && avatarUrlRaw !== 'None' && avatarUrlRaw !== '') {
+            let src = '';
+            if (avatarUrlRaw.startsWith('http')) {
+                src = avatarUrlRaw;
+            } else {
+                src = `/media/file/${avatarUrlRaw}`;
+            }
+            preview.innerHTML = `<img src="${src}" style="width: 100%; height: 100%; object-fit: cover;">`;
             preview.style.border = '2px solid var(--border-color)';
         } else {
             preview.innerHTML = '<span style="font-size: 40px; color: var(--text-secondary);">📷</span>';
