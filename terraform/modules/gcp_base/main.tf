@@ -284,6 +284,10 @@ resource "google_cloud_run_service" "default" {
           name  = "STORAGE_BACKEND"
           value = "gcs"
         }
+        env {
+          name  = "CLOUD_RUN_SERVICE_URL"
+          value = google_cloud_run_service.default.status[0].url
+        }
         # Secrets
         env {
           name = "DATABASE_URL"
