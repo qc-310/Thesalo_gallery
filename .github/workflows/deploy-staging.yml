@@ -124,6 +124,8 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -var="image_tag=${{ github.sha }}" -input=false
         env:
+          TF_VAR_project_id: ${{ env.PROJECT_ID }}
+          TF_VAR_region: ${{ env.REGION }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_db_url: ${{ secrets.SUPABASE_DB_URL_STAGING }}
           TF_VAR_flask_secret: ${{ secrets.FLASK_SECRET_STAGING }}
@@ -134,6 +136,8 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -var="image_tag=${{ github.sha }}" -auto-approve -input=false
         env:
+          TF_VAR_project_id: ${{ env.PROJECT_ID }}
+          TF_VAR_region: ${{ env.REGION }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           # TF_VAR_github_repo is not needed for staging/gcp?
           # Staging GCP main.tf doesn't use gh_oidc module, so it doesn't need github_repo var.
