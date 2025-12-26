@@ -26,11 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v2
+      - uses: github/codeql-action/init@v3
         with:
           languages: python
-      - uses: github/codeql-action/autobuild@v2
-      - uses: github/codeql-action/analyze@v2
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
 
   # 2. Build, Scan & Push (Trivy + Artifact Registry)
   build-and-push:
@@ -123,6 +123,13 @@ jobs:
 
       - name: Terraform Plan
         run: terraform plan -var="image_tag=${{ github.sha }}" -input=false
+        env:
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_db_url: ${{ secrets.SUPABASE_DB_URL_STAGING }}
+          TF_VAR_flask_secret: ${{ secrets.FLASK_SECRET_STAGING }}
+          TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID_STAGING }}
+          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET_STAGING }}
+          TF_VAR_owner_email: ${{ secrets.OWNER_EMAIL }}
 
       - name: Terraform Apply
         run: terraform apply -var="image_tag=${{ github.sha }}" -auto-approve -input=false

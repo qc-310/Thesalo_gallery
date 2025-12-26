@@ -3,6 +3,11 @@ variable "project_id" {
   type        = string
 }
 
+variable "image_tag" {
+  description = "Docker image tag to deploy"
+  type        = string
+}
+
 variable "region" {
   description = "GCP Region"
   type        = string
