@@ -55,19 +55,10 @@ def serve_file(filename):
     
     if current_app.config['STORAGE_BACKEND'] == 'gcs':
         try:
-            # Debug logging
-            print(f"DEBUG: Generating signed URL for {filename}")
-            print(f"DEBUG: Bucket: {current_app.config['GCS_BUCKET_NAME']}")
-            sa_email = media_service._get_service_account_email()
-            print(f"DEBUG: Service Account: {sa_email}")
-            
             url = media_service.generate_signed_url(filename)
-            print(f"DEBUG: Generated URL: {url}")
             return redirect(url)
         except Exception as e:
-            print(f"Error generating signed URL for {filename}: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error generating signed URL: {e}")
             abort(404)
             
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)

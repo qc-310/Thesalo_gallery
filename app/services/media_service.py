@@ -128,7 +128,7 @@ class MediaService:
         
         return blob.generate_signed_url(
             version="v4",
-            expiration=datetime.timedelta(seconds=expiration),
+            expiration=timedelta(seconds=expiration),
             method="GET",
             service_account_email=self._get_service_account_email()
         )
