@@ -252,7 +252,7 @@ resource "google_cloud_run_service" "default" {
       timeout_seconds       = 300
       service_account_name  = google_service_account.app_sa.email
       containers {
-        image = "us-docker.pkg.dev/cloudrun/container/hello" # Placeholder
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/thesalo-repo${local.suffix}/thesalo-web:${var.image_tag}"
 
         resources {
           limits = {

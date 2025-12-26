@@ -29,6 +29,7 @@ module "gcp_app" {
   custom_domain        = "www.thesalo-gallery.com" # Prod domain
   billing_account      = var.billing_account
   budget_amount        = 1000 # 1000 JPY
+  image_tag            = var.image_tag
 }
 
 module "gh_oidc" {

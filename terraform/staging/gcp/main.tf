@@ -15,6 +15,16 @@ provider "google" {
   region  = var.region
 }
 
+variable "project_id" {
+  description = "The GCP Project ID"
+  type        = string
+}
+
+variable "image_tag" {
+  description = "Docker image tag to deploy"
+  type        = string
+}
+
 module "gcp_app" {
   source = "../../modules/gcp_base"
 
@@ -29,4 +39,5 @@ module "gcp_app" {
   custom_domain        = var.custom_domain
   billing_account      = var.billing_account
   budget_amount        = 1000 # 1000 JPY
+  image_tag            = var.image_tag
 }
