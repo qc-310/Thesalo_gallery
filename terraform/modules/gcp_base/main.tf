@@ -169,9 +169,11 @@ resource "google_secret_manager_secret_iam_member" "sa_secret_accessor" {
 
 # 3. Cloud Storage Bucket
 resource "google_storage_bucket" "uploads" {
-  name          = "thesalo-uploads-${var.project_id}${local.suffix}"
+  name          = "thesalo-uploads-${var.project_id}${local.suffix}-v2"
   location      = var.region
   storage_class = "STANDARD"
+
+  force_destroy = true
 
   uniform_bucket_level_access = true
 

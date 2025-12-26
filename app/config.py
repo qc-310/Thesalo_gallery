@@ -38,7 +38,7 @@ class Config:
     # GCP
     GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT', 'thesalo-gallery')
     GCS_BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME', 'thesalo-uploads-thesalo-gallery')
-    CLOUD_TASKS_QUEUE_PATH = os.environ.get('CLOUD_TASKS_QUEUE_PATH', 'projects/thesalo-gallery/locations/us-west1/queues/image-processing-queue')
+    CLOUD_TASKS_QUEUE_PATH = os.environ.get('CLOUD_TASKS_QUEUE_PATH', 'projects/thesalo-gallery/locations/asia-northeast1/queues/image-processing-queue')
     CLOUD_RUN_SERVICE_URL = os.environ.get('CLOUD_RUN_SERVICE_URL') # For worker callback
 
 class DevelopmentConfig(Config):
