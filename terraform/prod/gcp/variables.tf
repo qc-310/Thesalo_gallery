@@ -11,7 +11,7 @@ variable "image_tag" {
 variable "region" {
   description = "GCP Region"
   type        = string
-  default     = "us-west1"
+  default     = "asia-northeast1"
 }
 
 variable "db_url" {
