@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app
 from werkzeug.utils import secure_filename
 from app.extensions import db
@@ -118,6 +118,19 @@ class MediaService:
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(object_name)
         blob.upload_from_file(file, content_type=mime_type)
+
+    def generate_signed_url(self, object_name, expiration=3600):
+        """Generate a signed URL for a GCS blob."""
+        storage_client = self._get_storage_client()
+        bucket_name = current_app.config['GCS_BUCKET_NAME']
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(object_name)
+        
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(seconds=expiration),
+            method="GET"
+        )
 
     def _save_to_local(self, file, object_name):
         # object_name = galleries/2023/12/foo.jpg
