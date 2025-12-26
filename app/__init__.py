@@ -8,6 +8,10 @@ def create_app(config_name=None):
         
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Fix for Cloud Run / Cloudflare (Handle HTTPS headers)
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     # Initialize Extensions
     db.init_app(app)
@@ -34,20 +38,13 @@ def create_app(config_name=None):
     app.register_blueprint(media_bp, url_prefix='/media')
     app.register_blueprint(core_bp)
     app.register_blueprint(pets_bp, url_prefix='/pets')
+    
+    from .blueprints.tasks import tasks_bp
+    app.register_blueprint(tasks_bp)
 
     # Configure Login Manager
     login_manager.login_view = 'auth.login_page'
 
-    # Celery Init
-    from .celery_utils import celery_init_app
-    app.config.from_mapping(
-        CELERY=dict(
-            broker_url=app.config['CELERY_BROKER_URL'],
-            result_backend=app.config['CELERY_RESULT_BACKEND'],
-            task_ignore_result=True,
-        ),
-    )
-    celery_init_app(app)
 
     @app.errorhandler(404)
     def page_not_found(e):

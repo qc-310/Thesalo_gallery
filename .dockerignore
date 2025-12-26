@@ -1,33 +1,60 @@
 .git
 .gitignore
+.dockerignore
 .devcontainer
 .vscode
 .idea
 __pycache__
 *.pyc
+*.pyo
+*.pyd
+
+# Environment & Secrets
 .env
 .env.*
-*.log
+*.env
+
+# Virtual Environment
 venv
 .venv
-cloudflared.exe
+env
+
+# Database
+*.db
+*.sqlite3
 thesalo_gallery.db
-uploads
-# Note: app/static/thumbnails might need exclusion if generated locally, 
-# but generally we want to exclude local data.
-app/static/thumbnails
+instance/
+
+# Logs
+*.log
+logs/
+
+# Local Storage
+uploads/
+app/static/thumbnails/
+
+# Terraform (CRITICAL: Do not include in image)
+terraform/
+*.tf
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Infrastructure & Deployment
 docker-compose.yml
+Dockerfile
+.github/
+migrations/
+scripts/
+
+# Documentation
+docs/
 CHANGELOG.md
 README.md
 
-# Development Directories
+# Tests & Coverage
 tests/
-scripts/
-docs/
-migrations/
-
-# Test & Coverage
-.pytest_cache
+.pytest_cache/
 .coverage
 htmlcov/
 .tox/
@@ -35,3 +62,5 @@ htmlcov/
 # OS specific
 .DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini

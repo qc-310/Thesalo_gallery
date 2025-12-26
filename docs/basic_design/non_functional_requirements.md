@@ -3,49 +3,41 @@
 ## 1. 性能要件 (Performance Requirements)
 
 - **応答時間 (Response Time)**:
-  - 通常のAPIレスポンス: 1秒以内を目標（動的コンテンツ）。
-  - 静的コンテンツ（CDN/Nginx経由）: 200ms以内。
-  - 重い処理（画像変換等）: 非同期処理とし、UIブロックを避ける。
-- **スループット (Throughput)**:
-  - 家族利用（数人〜十数人）を想定し、同時接続数 10ユーザー程度で快適に動作すること。
-  - GCE e2-micro (2 vCPU, 1GB RAM) の制限内でのベストエフォート。
+  - 通常のAPIレスポンス: 1秒以内を目標（Cloud Run Cold Start時を除く）。
+  - Cold Start許容: 初回アクセス時に数秒〜10秒程度の遅延が発生することを許容する（コスト優先）。
+  - 重い処理（画像変換等）: Cloud Tasksによる非同期処理とし、Webレスポンスは即時（Accept 202）を返す。
+- **スケーラビリティ (Scalability)**:
+  - **Scale to Zero**: アイドル時はインスタンス数0までスケールダウンし、コストを最小化する。
+  - **Auto Scaling**: トラフィック増加時に自動的にインスタンスを追加する（最大インスタンス数はコスト保護のため低めに設定: max 5-10）。
 
 ## 2. 可用性・信頼性 (Availability & Reliability)
 
-- **稼働率**: 個人の思い出管理用のため、商用レベルのSLA（99.9%等）は設定しない。
-- **障害対策**:
-  - コンテナの自動再起動設定 (`restart: always`)。
-  - ログ出力 (Fluentd等なし、ローカルファイルまたはDockerログでの簡易運用)。
+- **稼働率**: 個人の思い出管理用のため、商用レベルのSLA（99.9%等）は設定しない。Cloud Run / Supabase の SLA に準拠。
 - **データ保全**:
-  - PostgreSQLのデータボリュームはPersistent Diskに保存。
-  - アップロード画像も同様に永続化ディスクに保存。
-  - **Backups**: 手動またはCronによる定期的な `pg_dump` とメディア同期（GCS等への退避は別途検討）。
+  - **DB**: Supabase (PostgreSQL) のマネージドバックアップを利用。
+  - **Storage**: GCS (Google Cloud Storage) の高い耐久性 (99.999999999%) に依存。バージョニングを有効化し、誤削除を防ぐ。
 
 ## 3. セキュリティ (Security)
 
 - **通信暗号化**:
-  - 全通信 HTTPS化 (Let's Encrypt を使用)。
+  - Cloud Run が標準提供する HTTPS エンドポイントを使用。
 - **認証・認可**:
   - Google OAuth 2.0 による本人確認。
-  - `Family` 単位でのStrictなアクセス制御（他の家族のデータは見えない）。
+  - `Family` 単位でのStrictなアクセス制御（PostgreSQL RLS - Row Level Security も併用検討）。
 - **データ保護**:
-  - DBパスワード等は環境変数 (`.env`) で管理し、リポジトリに含めない。
-  - CSRF対策、XSS対策の実装。
+  - DB接続情報、APIキー等は Secret Manager で厳重に管理し、ソースコードには一切含めない。
+  - コンテナはステートレスであり、再起動でメモリ上のデータは消去されるため、機密情報の残留リスクが低い。
 
 ## 4. 保守性・拡張性 (Maintainability & Scalability)
 
-- **コード管理**:
-  - GitHubによるバージョン管理。
-  - Type Hinting (Python) の活用。
-  - **Infrastructure as Code (IaC)**: Terraformを用いてインフラ構成をコード管理し、手動オペレーションによる環境差異を排除する。
-- **ドキュメント**:
-  - API仕様書、DB設計書の維持管理。
-- **デプロイ**:
-  - **CI/CD**: GitHub Actionsによる自動テスト・自動デプロイを実装し、リリース作業の効率化とミス防止を図る。
-  - Docker Compose コマンド一発で更新可能な構成。
-  - 将来的なハイブリッドクラウド化（メディアのみGCS移行など）が可能な設計。
+- **Configuration**:
+  - 環境変数 (`os.environ`) と Secret Manager で構成を分離。
+  - Terraformにより、Staging/Production 環境を同一構成で再現可能にする。
+- **CI/CD**:
+  - GitHub Actions による自動テスト・自動デプロイ。
+  - `develop` ブランチへのPushでStagingへ、タグPushでProductionへデプロイ。
 
 ## 5. 運用・監視 (Operations & Monitoring)
 
-- **リソース監視**: GCPコンソールでのCPU/メモリ監視（無料枠内でのアラート設定）。
-- **ログ**: アプリケーションエラー時のスタックトレース記録。
+- **ログ**: Cloud Logging に集約。構造化ログを出力し、フィルタリングを容易にする。
+- **エラー通知**: アプリケーションエラー時にログレベル `ERROR` を出力し、Cloud Loggingのアラート機能で検知（要設定）。

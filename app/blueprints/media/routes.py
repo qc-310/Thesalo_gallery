@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_from_directory, current_app, abort, render_template
+from flask import Blueprint, request, jsonify, send_from_directory, current_app, abort, render_template, redirect
 from flask_login import login_required, current_user
 from app.services import MediaService
 from app.utils.decorators import role_required
@@ -46,17 +46,94 @@ def upload():
              
     return jsonify({'uploaded': results})
 
+@media_bp.route('/upload/sign', methods=['POST'])
+@login_required
+@role_required('family')
+def sign_upload():
+    if current_app.config.get('STORAGE_BACKEND') != 'gcs':
+        return jsonify({'error': 'Direct upload only supported for GCS'}), 400
+        
+    data = request.get_json()
+    filename = data.get('filename')
+    mime_type = data.get('mime_type')
+    
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+
+    if not mime_type:
+        import mimetypes
+        mime_type, _ = mimetypes.guess_type(filename)
+        if not mime_type:
+            mime_type = 'application/octet-stream'
+    
+    try:
+        result = media_service.generate_upload_signed_url(filename, mime_type)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@media_bp.route('/upload/finalize', methods=['POST'])
+@login_required
+@role_required('family')
+def finalize_upload():
+    data = request.get_json()
+    
+    object_name = data.get('object_name')
+    original_filename = data.get('original_filename')
+    mime_type = data.get('mime_type')
+    file_size = data.get('file_size')
+    description = data.get('description')
+    
+    # Basic validation
+    if not all([object_name, original_filename, mime_type, file_size]):
+        return jsonify({'error': 'Missing required fields'}), 400
+        
+    try:
+        media = media_service.finalize_upload(
+            object_name=object_name,
+            original_filename=original_filename,
+            mime_type=mime_type,
+            file_size=int(file_size),
+            uploader=current_user,
+            description=description
+        )
+        return jsonify({
+            'id': str(media.id),
+            'filename': media.filename,
+            'status': media.status
+        })
+    except Exception as e:
+        print(f"Finalize error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @media_bp.route('/file/<path:filename>')
 @login_required
 def serve_file(filename):
     # TODO: Add strict permission check (does user belong to family in filename path?)
     # filename likely starts with family_uuid/...
     # For now, strict login required is enforced.
+    
+    if current_app.config['STORAGE_BACKEND'] == 'gcs':
+        try:
+            url = media_service.generate_signed_url(filename)
+            return redirect(url)
+        except Exception as e:
+            print(f"Error generating signed URL: {e}")
+            abort(404)
+            
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 @media_bp.route('/thumb/<path:filename>')
 @login_required
 def serve_thumbnail(filename):
+    if current_app.config['STORAGE_BACKEND'] == 'gcs':
+        try:
+            # Thumbnails same bucket? assuming yes or same logic
+            url = media_service.generate_signed_url(filename)
+            return redirect(url)
+        except Exception as e:
+            print(f"Error generating thumbnail signed URL: {e}")
+            abort(404)
     return send_from_directory(current_app.config['UPLOAD_FOLDER'], filename)
 
 @media_bp.route('/<string:media_id>/update', methods=['POST'])

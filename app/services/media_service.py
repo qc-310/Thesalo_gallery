@@ -1,15 +1,18 @@
 import os
-import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app
 from werkzeug.utils import secure_filename
 from app.extensions import db
 from app.models.media import Media
 from app.models.auth import User
-from app.tasks.media_tasks import process_media_task
 import uuid6
 import magic
+from google.cloud import storage
+from google.cloud import tasks_v2
+import json
+import google.auth
+from google.auth import impersonated_credentials
 
 class MediaService:
     def allowed_file(self, filename: str) -> bool:
@@ -24,42 +27,89 @@ class MediaService:
         if ext in {".mp4", ".mov", ".avi", ".mkv"}:
             return "video"
         return "other"
+        
+    def _get_storage_client(self):
+        # On Cloud Run, default credentials don't support signing.
+        # We wrap them in ImpersonatedCredentials to use IAM API for signing.
+        if current_app.config.get('STORAGE_BACKEND') == 'gcs':
+             credentials, project = google.auth.default()
+             sa_email = self._get_service_account_email()
+             
+             # Only wrap if we have a specific SA email to impersonate and we are likely in a non-key env
+             # (Self-impersonation)
+             if sa_email:
+                 try:
+                     credentials = impersonated_credentials.Credentials(
+                         source_credentials=credentials,
+                         target_principal=sa_email,
+                         target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                         lifetime=3600
+                     )
+                 except Exception as e:
+                     print(f"Warning: Failed to create impersonated credentials: {e}")
+                     # Fallback to default if impersonation fails (e.g. local dev with key)
+
+             return storage.Client(credentials=credentials)
+             
+        return storage.Client()
+
+    def _get_tasks_client(self):
+        return tasks_v2.CloudTasksClient()
 
     def upload_media(self, file, uploader: User, description: str = None):
         if not file or not self.allowed_file(file.filename):
             raise ValueError("Invalid file or extension")
         
         filename = secure_filename(file.filename)
-        file_type = self.get_file_type(filename)
         
-        # Determine global save path: uploads/galleries/{yyyy}/{mm}/{filename}
+        # Determine global save path: galleries/{yyyy}/{mm}/{filename}
         now = datetime.now()
         yyyy = now.strftime('%Y')
         mm = now.strftime('%m')
         
-        upload_folder = Path(current_app.config['UPLOAD_FOLDER'])
-        # Changed to 'galleries' to distinguish from previous structure if needed, or just root
-        # Let's use 'galleries' as a namespace
-        gallery_dir = upload_folder / 'galleries' / yyyy / mm
-        gallery_dir.mkdir(parents=True, exist_ok=True)
+        # Unique check loop
+        base_name = Path(filename).stem
+        ext = Path(filename).suffix
+        counter = 0
         
-        # Handle duplicate filename
-        save_path = gallery_dir / filename
-        if save_path.exists():
-             stem = Path(filename).stem
-             ext = Path(filename).suffix
-             filename = f"{stem}_{uuid6.uuid7().hex[:8]}{ext}"
-             save_path = gallery_dir / filename
+        while True:
+            if counter == 0:
+                final_filename = filename
+            else:
+                final_filename = f"{base_name}_{counter}{ext}"
+            
+            # Object name (Relative path) used for DB
+            object_name = f"galleries/{yyyy}/{mm}/{final_filename}"
+            
+            # Check existence
+            if current_app.config['STORAGE_BACKEND'] == 'gcs':
+                if not self._gcs_exists(object_name):
+                    break
+            else:
+                 # Local
+                full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], yyyy, mm, final_filename)
+                if not os.path.exists(full_path):
+                    break
+            counter += 1
 
-        # Register in DB (Pending Status)
-        file.save(str(save_path))
-        file_size = save_path.stat().st_size
+        # Upload/Save
+        file.seek(0)
+        header = file.read(2048)
+        mime = magic.from_buffer(header, mime=True)
+        file.seek(0) # Reset
+        
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
 
-        mime = magic.from_file(str(save_path), mime=True)
+        if current_app.config['STORAGE_BACKEND'] == 'gcs':
+            self._save_to_gcs(file, object_name, mime)
+        else:
+            self._save_to_local(file, object_name)
         
         media = Media(
             uploader_id=uploader.id,
-            filename=str(save_path.relative_to(upload_folder)).replace('\\', '/'), # Store relative path
+            filename=object_name, 
             original_filename=file.filename,
             mime_type=mime,
             file_size_bytes=file_size,
@@ -69,11 +119,158 @@ class MediaService:
         db.session.add(media)
         db.session.commit()
         
-        # Trigger Async Task
-        process_media_task.delay(str(media.id))
+        # Trigger Task
+        if current_app.config['TASK_RUNNER'] == 'sync':
+            # Run directly
+            from app.blueprints.tasks import _process_media_logic
+            print(f"[Sync] Processing media {media.id} locally...")
+            _process_media_logic(str(media.id))
+        else:
+            self._create_cloud_task(media.id)
         
         return media
-    
+
+    def _gcs_exists(self, object_name):
+        storage_client = self._get_storage_client()
+        bucket_name = current_app.config['GCS_BUCKET_NAME']
+        bucket = storage_client.bucket(bucket_name)
+        return bucket.blob(object_name).exists()
+        
+    def _save_to_gcs(self, file, object_name, mime_type):
+        storage_client = self._get_storage_client()
+        bucket_name = current_app.config['GCS_BUCKET_NAME']
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(object_name)
+        blob.upload_from_file(file, content_type=mime_type)
+
+    def generate_signed_url(self, object_name, expiration=3600, method="GET", content_type=None):
+        """Generate a signed URL for a GCS blob."""
+        storage_client = self._get_storage_client()
+        bucket_name = current_app.config['GCS_BUCKET_NAME']
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(object_name)
+        
+        return blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(seconds=expiration),
+            method=method,
+            content_type=content_type
+        )
+
+    def generate_upload_signed_url(self, filename: str, mime_type: str):
+        """Generate a PUT signed URL for direct upload."""
+        if not self.allowed_file(filename):
+             raise ValueError("Invalid file extension")
+
+        # Determine path (same logic as upload_media)
+        now = datetime.now()
+        yyyy = now.strftime('%Y')
+        mm = now.strftime('%m')
+        
+        clean_name = secure_filename(filename)
+        base_name = Path(clean_name).stem
+        ext = Path(clean_name).suffix
+        
+        # We can't easily check for existence in GCS efficiently in a loop for signed URL generation 
+        # without network calls. For direct upload, we'll use a UUID to ensure uniqueness 
+        # to avoid collisions and overwrites.
+        unique_id = uuid6.uuid7().hex[:8]
+        final_filename = f"{base_name}_{unique_id}{ext}"
+        object_name = f"galleries/{yyyy}/{mm}/{final_filename}"
+        
+        url = self.generate_signed_url(
+            object_name, 
+            method="PUT", 
+            content_type=mime_type
+        )
+        
+        return {
+            'url': url,
+            'object_name': object_name,
+            'filename': final_filename
+        }
+
+    def finalize_upload(self, object_name: str, original_filename: str, mime_type: str, file_size: int, uploader: User, description: str = None):
+        """Create Media record after successful direct upload."""
+        
+        # Verify existence (optional but recommended)
+        if current_app.config['STORAGE_BACKEND'] == 'gcs':
+            if not self._gcs_exists(object_name):
+                raise ValueError("File not found in storage. Upload may have failed.")
+        
+        media = Media(
+            uploader_id=uploader.id,
+            filename=object_name, 
+            original_filename=original_filename,
+            mime_type=mime_type,
+            file_size_bytes=file_size,
+            status='processing',
+            description=description
+        )
+        db.session.add(media)
+        db.session.commit()
+        
+        # Trigger Task
+        if current_app.config['TASK_RUNNER'] == 'sync':
+            from app.blueprints.tasks import _process_media_logic
+            print(f"[Sync] Processing media {media.id} locally...")
+            _process_media_logic(str(media.id))
+        else:
+            self._create_cloud_task(media.id)
+            
+        return media
+
+    def _save_to_local(self, file, object_name):
+        # object_name = galleries/2023/12/foo.jpg
+        full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], object_name)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        file.save(full_path)
+
+    def _create_cloud_task(self, media_id):
+        client = self._get_tasks_client()
+        queue_path = current_app.config['CLOUD_TASKS_QUEUE_PATH']
+        worker_url = current_app.config['CLOUD_RUN_SERVICE_URL']
+        
+        if not worker_url:
+            # Fallback to request.host_url if available (handles dynamic domains)
+            from flask import request
+            if request:
+                worker_url = request.host_url.rstrip('/')
+
+        if not worker_url:
+            print("Warning: CLOUD_RUN_SERVICE_URL not set and request context missing. Task not created.")
+            return
+
+        # Cloud Run Worker URL (e.g., https://service-url/handlers/process-media)
+        url = f"{worker_url}/handlers/process-media"
+        
+        payload = {'media_id': str(media_id)}
+        json_payload = json.dumps(payload).encode()
+
+        task = {
+            'http_request': {
+                'http_method': tasks_v2.HttpMethod.POST,
+                'url': url,
+                'headers': {'Content-Type': 'application/json'},
+                'body': json_payload,
+                # Add OIDC token for authentication
+                'oidc_token': {
+                    'service_account_email': self._get_service_account_email()
+                }
+            }
+        }
+        
+        try:
+            client.create_task(parent=queue_path, task=task)
+        except Exception as e:
+            print(f"Failed to create cloud task: {e}")
+
+    def _get_service_account_email(self):
+        sa_email = os.environ.get('SERVICE_ACCOUNT_EMAIL')
+        if sa_email:
+            return sa_email
+        return f"thesalo-app-sa@{current_app.config['GOOGLE_CLOUD_PROJECT']}.iam.gserviceaccount.com"
+
     def get_global_media(self, limit=20, offset=0, sort_by='created_at_desc', filter_type='all', user_id=None):
         query = db.select(Media)
         
@@ -95,7 +292,7 @@ class MediaService:
         elif sort_by == 'taken_at_desc':
             query = query.order_by(Media.taken_at.desc().nullslast(), Media.created_at.desc())
         elif sort_by == 'taken_at_asc':
-             query = query.order_by(Media.taken_at.asc().nullslast(), Media.created_at.asc())
+            query = query.order_by(Media.taken_at.asc().nullslast(), Media.created_at.asc())
         else:
             # Default to created_at desc
             query = query.order_by(Media.created_at.desc())
@@ -111,17 +308,39 @@ class MediaService:
             return None
 
     def delete_media(self, media: Media):
-        # Delete file from filesystem
-        file_path = Path(current_app.config['UPLOAD_FOLDER']) / media.filename
-        if file_path.exists():
-            try:
-                file_path.unlink()
-            except OSError:
-                pass # Already deleted or permission error
+        if not media:
+             return
+             
+        # Delete from Storage
+        try:
+            if current_app.config['STORAGE_BACKEND'] == 'gcs':
+                storage_client = self._get_storage_client()
+                bucket_name = current_app.config['GCS_BUCKET_NAME']
+                bucket = storage_client.bucket(bucket_name)
                 
-        # Delete thumbnail if exists (assuming standard loc)
-        # To strictly clean, we should look for existing thumb task or property
-        # For now, let's remove from DB
+                # Delete Original
+                blob = bucket.blob(media.filename)
+                if blob.exists():
+                    blob.delete()
+                    
+                # Delete Thumbnail if exists
+                if media.thumbnail_path:
+                    thumb_blob = bucket.blob(media.thumbnail_path)
+                    if thumb_blob.exists():
+                        thumb_blob.delete()
+            else:
+                # Local Delete
+                full_path = os.path.join(current_app.config['UPLOAD_FOLDER'], media.filename)
+                if os.path.exists(full_path):
+                    os.remove(full_path)
+                if media.thumbnail_path:
+                    thumb_path = os.path.join(current_app.config['UPLOAD_FOLDER'], media.thumbnail_path)
+                    if os.path.exists(thumb_path):
+                        os.remove(thumb_path)
+
+        except Exception as e:
+            print(f"Error deleting from storage: {e}")
+                
         db.session.delete(media)
         db.session.commit()
 

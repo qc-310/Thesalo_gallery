@@ -186,58 +186,129 @@ function initAjaxUpload() {
             notification.style.display = 'none';
         }
 
+        const isGCS = form.dataset.storageBackend === 'gcs';
+        const fileInput = document.getElementById('file-input');
+
+        // Disable UI
+        btn.textContent = 'アップロード中...';
+        btn.disabled = true;
+        btn.style.opacity = '0.7';
+
+        if (notification) notification.style.display = 'none';
+
         try {
-            const response = await fetch(form.action, {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                // Success
-
-                // Reset form first
-                const fileInput = document.getElementById('file-input');
-                if (fileInput && fileInput.resetUploader) {
-                    fileInput.resetUploader();
-                } else {
-                    form.reset();
+            if (isGCS) {
+                // --- Direct GCS Upload Flow ---
+                const files = fileInput.files;
+                if (!files || files.length === 0) {
+                    throw new Error("ファイルが選択されていません");
                 }
 
-                // Show Success Modal
-                const successModal = document.getElementById('success-modal');
-                if (successModal) {
-                    successModal.classList.add('active');
-                    successModal.style.opacity = '1';
-                    successModal.style.visibility = 'visible';
-                } else {
-                    // Fallback if modal missing
-                    alert('アップロードしました！');
+                // Gather comments if possible. Since we have multiple comments inputs in preview,
+                // we need to map them to files. 
+                // Note: The preview logic generates independent textareas.
+                // We assume the order of files in fileInput matches the DOM order in previewContainer?
+                // initUploadPreview syncs fileInput.files from DataTransfer.
+                // We need to grab comments.
+
+                const commentInputs = document.querySelectorAll('#file-preview-container textarea[name="comments"]');
+                const comments = Array.from(commentInputs).map(input => input.value);
+
+                let successCount = 0;
+
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const comment = comments[i] || '';
+
+                    // 1. Get Signed URL
+                    btn.textContent = `アップロード中 (${i + 1}/${files.length})...`; // Update progress text
+
+                    const signRes = await fetch('/media/upload/sign', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            mime_type: file.type
+                        })
+                    });
+
+                    if (!signRes.ok) throw new Error('署名URLの取得に失敗しました');
+                    const signData = await signRes.json();
+
+                    // 2. Upload to GCS
+                    // Note: 'Content-Type' header MUST match what was signed
+                    const uploadRes = await fetch(signData.url, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': file.type
+                        },
+                        body: file
+                    });
+
+                    if (!uploadRes.ok) throw new Error('GCSへのアップロードに失敗しました');
+
+                    // 3. Finalize
+                    const finRes = await fetch('/media/upload/finalize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            object_name: signData.object_name,
+                            original_filename: file.name,
+                            mime_type: file.type,
+                            file_size: file.size,
+                            description: comment
+                        })
+                    });
+
+                    if (!finRes.ok) throw new Error('保存処理に失敗しました');
+                    successCount++;
                 }
 
             } else {
-                // Error
-                if (notification) {
-                    notification.textContent = 'アップロードに失敗しました: ' + (result.error || 'Unknown error');
-                    notification.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-                    notification.style.color = '#ef4444';
-                    notification.style.border = '1px solid #ef4444';
-                    notification.style.display = 'block';
-                } else {
-                    alert('アップロードに失敗しました。');
-                }
+                // --- Legacy Local Upload Flow ---
+                // Need to construct FormData correctly with comments
+                // The original form submit includes 'file' (multiple) and 'comments' (multiple)
+                // But since we manipulated fileInput via DataTransfer, we should be fine trusting formData?
+                // Actually, textareas are outside the form? No, they are appended to wrapper in previewContainer which is inside form.
+                // So FormData(form) should capture them.
+
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Upload failed');
             }
+
+            // --- Success Handling (Common) ---
+
+            // Reset form first
+            if (fileInput && fileInput.resetUploader) {
+                fileInput.resetUploader();
+            } else {
+                form.reset();
+            }
+
+            // Show Success Modal
+            const successModal = document.getElementById('success-modal');
+            if (successModal) {
+                successModal.classList.add('active');
+                successModal.style.opacity = '1';
+                successModal.style.visibility = 'visible';
+            } else {
+                alert('アップロードしました！');
+            }
+
         } catch (error) {
             console.error('Error:', error);
             if (notification) {
-                notification.textContent = 'エラーが発生しました。';
+                notification.textContent = 'エラーが発生しました: ' + error.message;
                 notification.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
                 notification.style.color = '#ef4444';
                 notification.style.border = '1px solid #ef4444';
                 notification.style.display = 'block';
             } else {
-                alert('エラーが発生しました。');
+                alert('エラーが発生しました: ' + error.message);
             }
         } finally {
             btn.textContent = originalBtnText;

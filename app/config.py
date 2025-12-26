@@ -6,6 +6,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 class Config:
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY') or 'you-will-never-guess'
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
+    
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Uploads
@@ -16,9 +19,27 @@ class Config:
     GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
     
-    # Celery
-    CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL')
-    CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND')
+
+    # Job & Storage Configuration
+    # 'gcs' or 'local'
+    STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'gcs')
+    # 'cloud_tasks' or 'sync'
+    # 'cloud_tasks' or 'sync'
+    TASK_RUNNER = os.environ.get('TASK_RUNNER', 'cloud_tasks')
+
+    # Dev Login Bypass
+    BYPASS_AUTH = os.environ.get('BYPASS_AUTH', 'false').lower() == 'true'
+    
+    # Local Storage Path (only used if STORAGE_BACKEND='local')
+    # Local Storage Path (only used if STORAGE_BACKEND='local')
+    # UPLOAD_FOLDER explicitly defined above, removing duplicate here if identical or fixing precedence
+    # UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'uploads')
+
+    # GCP
+    GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT', 'thesalo-gallery')
+    GCS_BUCKET_NAME = os.environ.get('GCS_BUCKET_NAME', 'thesalo-uploads-thesalo-gallery')
+    CLOUD_TASKS_QUEUE_PATH = os.environ.get('CLOUD_TASKS_QUEUE_PATH', 'projects/thesalo-gallery/locations/asia-northeast1/queues/image-processing-queue')
+    CLOUD_RUN_SERVICE_URL = os.environ.get('CLOUD_RUN_SERVICE_URL') # For worker callback
 
 class DevelopmentConfig(Config):
     DEBUG = True

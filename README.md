@@ -1,7 +1,7 @@
-# Thesalo Gallery v2.0.0
+# Thesalo Gallery v3.0.0
 
 Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュアな写真・動画共有ギャラリーです。
-家族や友人との思い出共有を目的として設計されており、役割（Owner, Family, Guest）に応じた柔軟な権限管理が可能です。
+家族や友人との思い出共有を目的として設計されており、Cloud Run + Supabase によるモダンな構成で動作します。
 
 ## 主な機能
 
@@ -12,28 +12,30 @@ Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュ�
   * **Guest (ゲスト)**: 閲覧および「お気に入り (Like)」のみ可能。
 * **ペット管理**: ペットのプロフィール登録、自己紹介、アイコン設定。
 * **マルチメディア対応**:
-  * **写真**: EXIF情報自動取得、撮影日順ソート、HEIC対応、クロッピング機能。
-  * **動画**: サムネイル自動生成 (ffmpeg)、ブラウザでの再生に対応。
-* **非同期処理**: Celery + Redis による画像の最適化・変換処理のバックグラウンド実行。
+  * **写真**: EXIF情報自動取得、撮影日順ソート、HEIC対応。
+  * **動画**: サムネイル自動生成、ブラウザでの再生に対応。
+* **ハイブリッドアーキテクチャ**:
+  * **Local**: Local File System + 同期処理 (Sync) で手軽に開発。
+  * **Prod**: Google Cloud Storage + Cloud Tasks でスケーラブルに稼働。
 * **お気に入り**: 写真・動画へのお気に入り登録とフィルタリング。
 * **モバイル最適化**: スマートフォンでの操作性を重視したレスポンシブデザイン。
 
 ## 技術スタック
 
-* **Backend**: Python 3.11 (Flask)
-* **Database**: PostgreSQL 15
-* **Queue/Cache**: Redis 7
-* **Worker**: Celery (非同期タスク)
+* **Backend**: Python 3.11 (Flask 3.x)
+* **Database**: PostgreSQL 15 (Supabase / Local)
+* **Storage**: Google Cloud Storage / Local File System
+* **Async Tasks**: Google Cloud Tasks (Prod) / Sync execution (Local)
 * **Frontend**: HTML5, CSS3 (Grid/Masonry), Vanilla JS
 * **Auth**: Authlib (Google OAuth 2.0)
-* **Infrastructure**: Docker, Docker Compose
+* **Infrastructure**: Docker, Terraform, Cloud Run
 
 ## 必要要件
 
 * Docker / Docker Compose
 * Google Cloud Platform プロジェクト (OAuth 2.0 クライアントIDが必要)
 
-## セットアップ手順
+## セットアップ手順 (ローカル開発)
 
 ### 1. Google OAuth の設定
 
@@ -41,11 +43,10 @@ Thesalo Gallery は、Google認証と権限管理(RBAC)を備えた、セキュ�
 2. 「APIとサービス」>「認証情報」から **OAuth クライアント ID** を作成。
 3. **承認済みのリダイレクト URI** に以下を設定:
     * ローカル: `http://localhost:5000/auth/callback`
-    * 本番: `https://your-domain.com/auth/callback`
 
 ### 2. 環境変数の設定 (`.env`)
 
-ルート直下に `.env` ファイルを作成し、以下の環境変数を設定してください。
+ルート直下に `.env` ファイルを作成し、以下の環境変数を設定してください（`.env.example` 参照）。
 
 ```bash
 # Flask Config
@@ -53,22 +54,18 @@ FLASK_APP=app:create_app
 FLASK_DEBUG=1
 FLASK_SECRET_KEY=change_this_to_random_secret_string
 
-# Database & Cache
-DATABASE_URL=postgresql://user:password@db:5432/thesalo_db
-REDIS_URL=redis://redis:6379/0
-CELERY_BROKER_URL=redis://redis:6379/0
-CELERY_RESULT_BACKEND=redis://redis:6379/0
-
 # Google OAuth
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-# Owner Configuration (Initial Setup)
-# 最初にこのメールアドレスでログインしたユーザーが自動的に Owner 権限を取得します
+# Owner Configuration
 OWNER_EMAIL=your_email@example.com
 
-# Upload Settings
-MAX_IMAGE_SIZE=1920
+# Local Dev Settings
+STORAGE_BACKEND=local
+TASK_RUNNER=sync
+BYPASS_AUTH=true
+# DATABASE_URL は docker-compose.yml のデフォルト値が使用されるため設定不要（カスタマイズ可）
 ```
 
 ### 3. アプリケーションの起動
@@ -78,13 +75,30 @@ docker compose up --build -d
 ```
 
 起動後、`http://localhost:5000` にアクセスしてください。
+開発モード (`BYPASS_AUTH=true`) の場合、ログイン画面に表示される「Dev Owner Login」ボタンで即座に管理者としてログインできます。
 
-### 4. ユーザー権限の設定
+## デプロイ (CI/CD)
 
-1. `.env` の `OWNER_EMAIL` に設定したアカウントでログインします（自動的にOwnerになります）。
-2. アプリ内の「設定」→「ユーザー管理」にアクセスします。
-3. 他のユーザー（家族）がログインした後、リストから「家族にする」ボタンを押して権限を付与してください。
-   * 新規ユーザーはデフォルトで **Guest (閲覧のみ)** として登録されます。
+GitHub Actions と Terraform を連携させた最新のCI/CDパイプラインを構築済みです。
+
+### 1. Environments
+
+* **Staging**: `develop` ブランチが更新されると自動デプロイされます。 (`staging.thesalo-gallery.com`)
+* **Production**: `v*` (例: `v3.0.0`) のタグがプッシュされると自動デプロイされます。 (`www.thesalo-gallery.com`)
+
+### 2. Workflow
+
+1. **CI Check**: `feature/*` ブランチのPR作成時に静的解析 (CodeQL, Flake8) とテストを実行。
+2. **Staging Deploy**: `develop` マージ時にDockerビルド・セキュリティスキャン (Trivy)・Terraform適用を実行。
+3. **Production Deploy**: リリースタグ作成時に本番環境へ安全にプロモート。
+
+### 3. コスト最適化 (Cost Optimization)
+
+個人開発での運用を考慮し、Terraformレベルで以下の最適化を適用しています。
+
+* **Cloud Run**: `min_instances = 0` (スケール・トゥ・ゼロ) により、アクセスがない時間は課金されません。
+* **Limits**: インスタンス数 (`max=1`) とリソース (`512Mi`) を制限し、意図しない課金爆発を防ぎます。
+* **GC**: Artifact Registry (直近5世代のみ保持) や Cloud Storage (不要なアップロード断片の削除) の自動掃除ポリシーを適用済。
 
 ## ディレクトリ構成
 
@@ -97,16 +111,9 @@ docker compose up --build -d
 │   ├── static/           # CSS, JS, Images
 │   └── templates/        # HTMLテンプレート
 ├── scripts/              # ユーティリティスクリプト
-├── uploads/              # メディア保存先 (Dockerボリューム)
+├── uploads/              # メディア保存先 (Local Dev用)
 ├── migrations/           # DBマイグレーションファイル
-├── docker-compose.yml    # コンテナ構成
-└── Dockerfile            # Dockerイメージ定義
+├── terraform/            # インフラ定義 (GCP)
+├── docker-compose.yml    # ローカル開発用コンテナ構築
+└── Dockerfile            # 本番/開発共通コンテナ定義
 ```
-
-## 運用について
-
-* **バックアップ**:
-  * `uploads/` ディレクトリ（写真・動画の実体）
-  * `postgres_data` ボリューム（データベース）
-* **ログ確認**:
-  * `docker compose logs -f` でアプリとワーカーのログを確認できます。
