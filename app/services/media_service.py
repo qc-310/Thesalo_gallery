@@ -11,6 +11,8 @@ import magic
 from google.cloud import storage
 from google.cloud import tasks_v2
 import json
+import google.auth
+from google.auth import impersonated_credentials
 
 class MediaService:
     def allowed_file(self, filename: str) -> bool:
@@ -27,6 +29,28 @@ class MediaService:
         return "other"
         
     def _get_storage_client(self):
+        # On Cloud Run, default credentials don't support signing.
+        # We wrap them in ImpersonatedCredentials to use IAM API for signing.
+        if current_app.config.get('STORAGE_BACKEND') == 'gcs':
+             credentials, project = google.auth.default()
+             sa_email = self._get_service_account_email()
+             
+             # Only wrap if we have a specific SA email to impersonate and we are likely in a non-key env
+             # (Self-impersonation)
+             if sa_email:
+                 try:
+                     credentials = impersonated_credentials.Credentials(
+                         source_credentials=credentials,
+                         target_principal=sa_email,
+                         target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                         lifetime=3600
+                     )
+                 except Exception as e:
+                     print(f"Warning: Failed to create impersonated credentials: {e}")
+                     # Fallback to default if impersonation fails (e.g. local dev with key)
+
+             return storage.Client(credentials=credentials)
+             
         return storage.Client()
 
     def _get_tasks_client(self):
@@ -129,8 +153,7 @@ class MediaService:
         return blob.generate_signed_url(
             version="v4",
             expiration=timedelta(seconds=expiration),
-            method="GET",
-            service_account_email=self._get_service_account_email()
+            method="GET"
         )
 
     def _save_to_local(self, file, object_name):
