@@ -43,7 +43,4 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY . .
 
-# Cloud Run expects the container to listen on $PORT (default 8080)
-# We use 'exec' to ensure gunicorn receives signals correctly.
-# We bind to 0.0.0.0:$PORT
-CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 4 app:create_app()
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 8 --timeout 0 "app:create_app()"
