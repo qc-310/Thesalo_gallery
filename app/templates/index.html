@@ -164,8 +164,13 @@
         <div class="uploader-avatar"
           style="width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; overflow: hidden; background: #eee;">
           {% if m.uploader and m.uploader.avatar_url %}
+          {% if m.uploader.avatar_url.startswith('http') %}
+          <img src="{{ m.uploader.avatar_url }}" alt="{{ m.uploader.name }}"
+            style="width: 100%; height: 100%; object-fit: cover;">
+          {% else %}
           <img src="{{ url_for('media.serve_file', filename=m.uploader.avatar_url) }}" alt="{{ m.uploader.name }}"
             style="width: 100%; height: 100%; object-fit: cover;">
+          {% endif %}
           {% else %}
           <div
             style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 18px;">

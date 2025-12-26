@@ -22,7 +22,7 @@ class Config:
 
     # Job & Storage Configuration
     # 'gcs' or 'local'
-    STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'gcs')
+    STORAGE_BACKEND = os.environ.get('STORAGE_BACKEND', 'local')
     # 'cloud_tasks' or 'sync'
     # 'cloud_tasks' or 'sync'
     TASK_RUNNER = os.environ.get('TASK_RUNNER', 'cloud_tasks')
@@ -31,7 +31,9 @@ class Config:
     BYPASS_AUTH = os.environ.get('BYPASS_AUTH', 'false').lower() == 'true'
     
     # Local Storage Path (only used if STORAGE_BACKEND='local')
-    UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'uploads')
+    # Local Storage Path (only used if STORAGE_BACKEND='local')
+    # UPLOAD_FOLDER explicitly defined above, removing duplicate here if identical or fixing precedence
+    # UPLOAD_FOLDER = os.path.join(os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'uploads')
 
     # GCP
     GOOGLE_CLOUD_PROJECT = os.environ.get('GOOGLE_CLOUD_PROJECT', 'thesalo-gallery')

@@ -73,7 +73,7 @@ class Media(BaseModel):
     
     thumbnail_path: Mapped[Optional[str]] = mapped_column(String(1024))
     
-    thumbnail_path: Mapped[Optional[str]] = mapped_column(String(1024))
+
     
     uploader: Mapped["User"] = relationship("User") # Add relationship to User
     tags: Mapped[List["Tag"]] = relationship(secondary=media_tags, backref="media")
