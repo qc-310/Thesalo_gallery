@@ -43,7 +43,7 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY . .
 
-EXPOSE 5000
-
-# Use direct gunicorn command or via scripts
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:create_app()"]
+# Cloud Run expects the container to listen on $PORT (default 8080)
+# We use 'exec' to ensure gunicorn receives signals correctly.
+# We bind to 0.0.0.0:$PORT
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 4 app:create_app()
