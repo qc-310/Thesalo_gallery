@@ -1,0 +1,13 @@
+# Global owner
+* @qc-310
+
+# Infrastructure
+/terraform/ @qc-310
+/.github/ @qc-310
+
+# Backend
+/app/ @qc-310
+/migrations/ @qc-310
+
+# Documentation
+/*.md @qc-310
