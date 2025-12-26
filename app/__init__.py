@@ -8,6 +8,10 @@ def create_app(config_name=None):
         
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Fix for Cloud Run / Cloudflare (Handle HTTPS headers)
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
     
     # Initialize Extensions
     db.init_app(app)
