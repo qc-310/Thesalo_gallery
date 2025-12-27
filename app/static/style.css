@@ -505,27 +505,29 @@ textarea:focus {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Delete Button Loading State */
 .btn.loading {
-    opacity: 0.7;
-    pointer-events: none;
-    cursor: wait;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: wait;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn.loading::before {
-    content: "";
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-radius: 50%;
-    border-top-color: currentColor;
-    animation: spin 1s linear infinite;
+  content: "";
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: currentColor;
+  animation: spin 1s linear infinite;
 }
 
 
@@ -949,5 +951,30 @@ textarea:focus {
 
   .container {
     padding: 16px 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .header-container {
+    padding: 0 16px;
+  }
+
+  .logo {
+    font-size: 18px;
+  }
+
+  .user-name {
+    display: none;
+    /* Hide name on mobile to save space */
+  }
+
+  .logout-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  .user-avatar {
+    width: 28px;
+    height: 28px;
   }
 }
