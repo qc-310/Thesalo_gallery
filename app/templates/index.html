@@ -151,6 +151,14 @@
       url_for('media.serve_file',
       filename=m.filename) %}
       <img class="grid-media" src="{{ thumb }}" loading="lazy" alt="Video Thumbnail">
+
+      {% if m.status == 'processing' %}
+      <div class="processing-overlay">
+        <div class="spinner"></div>
+        <span>処理中...</span>
+      </div>
+      {% endif %}
+
       <div class="play-icon">▶</div>
       <div class="video-badge">VIDEO</div>
       {% endif %}
@@ -293,30 +301,31 @@
 
   function deleteMedia() {
     showConfirmModal('本当にこの写真/動画を削除しますか？', function () {
-      performDelete();
+      return performDelete();
     });
   }
 
   function performDelete() {
     const id = document.getElementById('edit-media-id').value;
 
-    // Close confirm modal first (optional)
-    closeConfirmModal();
-
-    fetch(`/media/${id}/delete`, {
+    return fetch(`/media/${id}/delete`, {
       method: 'POST'
     })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
+          // Show success modal and resolve immediately to close confirm modal
           showMessageModal('削除しました', 'ファイルは完全に削除されました。', () => location.reload());
+          return;
         } else {
           showErrorModal('削除失敗: ' + (data.error || 'Unknown error'));
+          throw new Error(data.error);
         }
       })
       .catch(err => {
         console.error(err);
-        showErrorModal('エラーが発生しました');
+        if (!err.message) showErrorModal('エラーが発生しました');
+        throw err; // Propagate to reset button
       });
   }
 
