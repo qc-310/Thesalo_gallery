@@ -586,11 +586,36 @@ window.showConfirmModal = function (message, onConfirm) {
         const newOkBtn = okBtn.cloneNode(true);
         okBtn.parentNode.replaceChild(newOkBtn, okBtn);
 
-        newOkBtn.onclick = function () {
+        newOkBtn.onclick = async function () {
             if (window.currentConfirmCallback) {
-                window.currentConfirmCallback();
+                const result = window.currentConfirmCallback();
+
+                // If callback returns a Promise, handle loading state
+                if (result && typeof result.then === 'function') {
+                    const originalText = newOkBtn.textContent;
+                    newOkBtn.textContent = '実行中...';
+                    newOkBtn.classList.add('loading');
+                    newOkBtn.disabled = true;
+
+                    try {
+                        await result;
+                        // On success, we close. 
+                        // Note: If the callback reloads the page, this might not be reached or needed.
+                        closeConfirmModal();
+                    } catch (e) {
+                        // On error, reset button
+                        console.error(e);
+                        newOkBtn.textContent = originalText;
+                        newOkBtn.classList.remove('loading');
+                        newOkBtn.disabled = false;
+                    }
+                } else {
+                    // Synchronous
+                    closeConfirmModal();
+                }
+            } else {
+                closeConfirmModal();
             }
-            closeConfirmModal();
         };
     }
 };
@@ -601,5 +626,13 @@ window.closeConfirmModal = function () {
         modal.classList.remove('active');
         modal.style.opacity = '0';
         modal.style.visibility = 'hidden';
+
+        // Reset button state just in case
+        const okBtn = document.getElementById('confirm-ok-btn');
+        if (okBtn) {
+            okBtn.classList.remove('loading');
+            okBtn.disabled = false;
+            okBtn.textContent = '実行'; // Default text, might need to be careful if we customized it
+        }
     }
 };

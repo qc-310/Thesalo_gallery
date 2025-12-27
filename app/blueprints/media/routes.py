@@ -171,7 +171,7 @@ def delete_media_item(media_id):
     if not media:
         return jsonify({'error': 'Media not found'}), 404
         
-    if media.uploader_id != current_user.id:
+    if media.uploader_id != current_user.id and not current_user.is_owner:
         # Check if family owner? For now only uploader can delete
         return jsonify({'error': 'Permission denied'}), 403
         

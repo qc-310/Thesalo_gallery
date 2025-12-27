@@ -44,6 +44,7 @@ def create_app(config_name=None):
 
     # Configure Login Manager
     login_manager.login_view = 'auth.login_page'
+    login_manager.login_message = '' # Suppress default "Please log in..." message
 
 
     @app.errorhandler(404)
