@@ -189,6 +189,13 @@ resource "google_storage_bucket" "uploads" {
     }
   }
 
+  cors {
+    origin          = ["*"]
+    method          = ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"]
+    response_header = ["*"]
+    max_age_seconds = 3600
+  }
+
   depends_on = [google_project_service.apis]
 }
 
@@ -353,9 +360,10 @@ resource "google_cloud_run_service" "default" {
 
     metadata {
       annotations = {
-        "autoscaling.knative.dev/minScale"  = tostring(var.min_instances)
-        "autoscaling.knative.dev/maxScale"  = tostring(var.max_instances)
-        "run.googleapis.com/cpu-throttling" = "true" # Ensure CPU is only allocated during request processing
+        "autoscaling.knative.dev/minScale"     = tostring(var.min_instances)
+        "autoscaling.knative.dev/maxScale"     = tostring(var.max_instances)
+        "run.googleapis.com/cpu-throttling"    = "true" # Ensure CPU is only allocated during request processing
+        "run.googleapis.com/startup-cpu-boost" = var.startup_cpu_boost ? "true" : "false"
       }
     }
   }

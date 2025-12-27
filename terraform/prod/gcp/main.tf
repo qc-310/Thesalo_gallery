@@ -31,6 +31,8 @@ module "gcp_app" {
   billing_account      = var.billing_account
   budget_amount        = 1000 # 1000 JPY
   image_tag            = var.image_tag
+  startup_cpu_boost    = true
+  max_instances        = 2
 }
 
 module "gh_oidc" {
