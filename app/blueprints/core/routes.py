@@ -33,8 +33,17 @@ def profile():
         from werkzeug.utils import secure_filename
         
         # Update text fields
-        display_name = request.form.get('display_name')
+        display_name = request.form.get('display_name', '').strip()
         bio = request.form.get('bio')
+        
+        # Validation
+        if not display_name:
+             flash('ニックネームは必須です', 'error')
+             return redirect(url_for('core.profile'))
+             
+        if len(display_name) > 10:
+             flash('ニックネームは10文字以内で入力してください', 'error')
+             return redirect(url_for('core.profile'))
         
         current_user.display_name = display_name
         current_user.bio = bio
