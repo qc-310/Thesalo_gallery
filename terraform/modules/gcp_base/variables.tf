@@ -96,3 +96,9 @@ variable "currency_code" {
   type        = string
   default     = "JPY"
 }
+
+variable "startup_cpu_boost" {
+  description = "Enable Cloud Run Startup CPU Boost"
+  type        = bool
+  default     = false
+}
