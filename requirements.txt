@@ -24,7 +24,7 @@ python-magic==0.4.27; sys_platform != 'win32'
 
 # Utilities
 Authlib==1.6.6
-requests==2.32.4
+requests==2.32.5
 python-dotenv==1.0.0
 uuid6==2023.5.2
 python-dateutil==2.8.2
